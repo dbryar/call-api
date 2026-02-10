@@ -43,6 +43,8 @@ But GraphQL's strengths are also its constraints.
 
 **HTTP-bound in practice.** The spec is theoretically transport-agnostic, but the ecosystem assumes HTTP POST with a JSON body. Subscriptions assume WebSocket. Running GraphQL over MQTT or Kafka is not a real pattern.
 
+**Versioning is field-level, not operation-level.** GraphQL's `@deprecated` directive marks individual fields as deprecated with a `reason` string. This works for additive schemas where fields accumulate over time. But it cannot express a breaking schema change — a renamed field, a restructured type, a changed return shape. There is no concept of "v2 of this query." The convention is to never break the schema and keep adding fields forever, which works until it doesn't. CALL versions at the operation level: `v1:orders.getItem` and `v2:orders.getItem` coexist with independent schemas, and `v1` has a contractual sunset date.
+
 GraphQL solves "I want different shapes of the same data." CALL solves "I want to invoke an operation and track its lifecycle."
 
 ---
@@ -67,6 +69,8 @@ The constraints show up at the edges.
 - **Twirp** (Twitch) — Simpler than gRPC, works over HTTP 1.1, no streaming. A pragmatic choice that accepts smaller scope.
 - **Connect** (Buf) — The closest to CALL's philosophy in this category. Browser-compatible, supports streaming, works over HTTP 1.1 and 2. But still protobuf-first, no operation registry, no lifecycle model, no transport bindings beyond HTTP.
 - **Cap'n Proto** — Zero-copy serialization with RPC. Exceptional performance for specific use cases. Niche adoption.
+
+**Version evolution relies on protobuf conventions.** Protobuf's wire format supports backward-compatible changes (adding fields, keeping field numbers stable), but this is a serialization property, not a protocol feature. There is no built-in deprecation lifecycle, no sunset dates, no registry that advertises which RPCs are deprecated or what replaces them. Developers manage version evolution through protobuf field numbering discipline and documentation. CALL makes evolution explicit: the registry advertises deprecated operations, their sunset dates, and their replacements.
 
 Binary RPC frameworks optimize for service-to-service performance. CALL optimizes for universal accessibility — JSON, any transport, any caller.
 
@@ -149,6 +153,8 @@ The industry standard for REST API description. Massive tooling ecosystem — Sw
 
 But OpenAPI describes REST; it doesn't fix REST. The generated SDK still maps classes to URL segments, methods to HTTP verbs, IDs to path parameters. The spec is a static artifact — a YAML or JSON file checked into a repo. It can drift from the implementation. It can be wrong. It can be out of date. And the codegen output is the REST SDK problem described in [`client.md`](client.md) — hundreds of generated classes that exist solely to reconstruct URLs.
 
+REST API versioning is notoriously inconsistent — URL path (`/v1/`, `/v2/`), custom headers (`Api-Version`), query parameters (`?version=2`), or content negotiation. OpenAPI describes whichever approach the API chose, but doesn't standardize one. CALL standardizes versioning in the operation name itself (`v1:orders.getItem`), with deprecation status and sunset dates in the registry.
+
 OpenAPI is HTTP-only. There is no standard way to describe an MQTT or Kafka binding in an OpenAPI spec.
 
 ### AsyncAPI
@@ -161,7 +167,7 @@ But AsyncAPI is a description format, not a protocol. It tells you what messages
 
 AWS's protocol-agnostic interface definition language. Separates the API model from the protocol binding — a Smithy model can generate clients for REST, gRPC, or any other protocol. The design philosophy is sound and could theoretically generate CALL clients. Smithy is complementary, not competing.
 
-**The common gap:** these tools describe APIs as external artifacts. CALL's [registry](specification.md#self-description-endpoint) IS the API description, served live by the application itself at `GET /.well-known/ops`. No artifact to drift. No version to pin. The contract is always current because the contract is the running service.
+**The common gap:** these tools describe APIs as external artifacts. CALL's [registry](specification.md#self-description-endpoint) _is_ the API description, served live by the application itself at `GET /.well-known/ops`. No artifact to drift. No version to pin. The contract is always current because the contract is the running service.
 
 ---
 

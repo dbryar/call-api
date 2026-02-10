@@ -52,6 +52,20 @@ The system supports:
 POST /call
 ```
 
+### Operation Naming Convention
+
+Every operation name MUST be prefixed with a version: `v{N}:namespace.operation`.
+
+```
+v1:orders.getItem
+v1:identity.verify
+v1:device.readPosition
+```
+
+The version prefix is part of the `op` name — it flows through the envelope, registry, and routing unchanged. Version numbers are positive integers, monotonically increasing per operation lineage (`v1`, `v2`, `v3`, ...).
+
+All operations start at `v1`. When a breaking change is needed, a new version is introduced (e.g. `v2:orders.getItem`) while the old version remains available until its sunset date. See [Schema Evolution](#schema-evolution) for what constitutes a breaking change.
+
 ---
 
 ## Invocation Request Envelope
@@ -249,7 +263,7 @@ Used for long-running operations.
 
 ### Stream Subscription
 
-1. Caller sends `POST /call` with a streaming operation (e.g. `op: "subscribeToStream"`)
+1. Caller sends `POST /call` with a streaming operation (e.g. `op: "v1:subscribeToStream"`)
 2. Server returns `202` with the canonical response envelope containing the `stream` object (streams involve a transport change, so 303 auto-follow is not appropriate)
 3. Caller reads the `stream` object, connects to `stream.location` using the specified `stream.transport` and credentials if provided
 4. Frames arrive as raw encoded data — no envelope wrapping per frame
@@ -275,6 +289,7 @@ The system MUST return a descriptive payload whenever possible.
 | 401 | Authentication invalid |
 | 403 | Authentication valid but insufficient |
 | 404 | Resource not found — the requested operation result, chunk, or media object does not exist or has expired |
+| 410 | Operation removed — the operation existed but has been removed past its sunset date. The error payload includes `replacement` if a successor exists |
 | 500 | Internal failure with full error payload |
 | 502 | Upstream dependency failure |
 | 503 | Service unavailable |
@@ -288,6 +303,7 @@ The system MUST return a descriptive payload whenever possible.
 - Zero-information 500 responses are forbidden.
 - 303 is reserved for plain HTTP redirects with no auth and no transport change (e.g. pre-signed S3 URL, public CDN). The `Location` header and `location.uri` carry the same URI.
 - 202 MUST be used instead of 303 when any of: auth is required, the target uses a non-HTTP transport (WebSocket, MQTT, QUIC, etc.), or the result is not yet ready. The caller reads the body and connects manually.
+- 410 responses indicate that a deprecated operation has been removed past its sunset date. The error payload MUST include the `OP_REMOVED` code and SHOULD include the `replacement` operation name if one exists.
 
 ---
 
@@ -422,7 +438,7 @@ Content-Disposition: form-data; name="envelope"
 Content-Type: application/json
 
 {
-  "op": "identity.verify",
+  "op": "v1:identity.verify",
   "args": {
     "fullName": "Jane Smith",
     "dateOfBirth": "1990-05-15",
@@ -456,7 +472,7 @@ A pre-uploaded video is referenced by URI:
 
 ```json
 {
-  "op": "media.transcode",
+  "op": "v1:media.transcode",
   "args": { "outputFormat": "h265", "quality": "high" },
   "media": [
     { "name": "source", "mimeType": "video/mp4", "ref": "https://uploads.example.com/obj/abc123" }
@@ -473,7 +489,7 @@ Operations that accept media declare a `mediaSchema` in the registry:
 
 ```json
 {
-  "op": "identity.verify",
+  "op": "v1:identity.verify",
   "mediaSchema": [
     { "name": "selfie", "required": true, "acceptedTypes": ["image/jpeg", "image/png"], "maxBytes": 10485760 },
     { "name": "bankStatement", "required": true, "acceptedTypes": ["application/pdf"], "maxBytes": 52428800 }
@@ -557,6 +573,23 @@ The operation registry MAY declare `frameIntegrity: true` to indicate that frame
 }
 ```
 
+### Operation Removed (410)
+
+```json
+{
+  "requestId": "uuid",
+  "state": "error",
+  "error": {
+    "code": "OP_REMOVED",
+    "message": "v1:orders.getItem was removed on 2026-06-01",
+    "cause": {
+      "removedOp": "v1:orders.getItem",
+      "replacement": "v2:orders.getItem"
+    }
+  }
+}
+```
+
 ### Transport/System Error (500–503)
 
 ```json
@@ -595,6 +628,38 @@ The core spec does not define response signing at the envelope level. Response a
 - **MQTT/Kafka** — TLS on the broker connection.
 
 When security requirements demand end-to-end response signing beyond transport guarantees (e.g. non-repudiation, offline verification, multi-hop relay scenarios), implementers SHOULD use HTTP Message Signatures or equivalent mechanisms at the transport binding layer rather than adding signing fields to the canonical envelope.
+
+---
+
+## Schema Evolution
+
+Operations evolve. The versioning model ensures that evolution is safe for existing callers.
+
+### Safe Changes (Non-Breaking)
+
+These changes do not require a new version. The operation keeps its existing `v{N}:` prefix:
+
+- Add an optional field to `argsSchema`
+- Add a field to `resultSchema`
+- Add an optional slot to `mediaSchema`
+- Widen a type (e.g. `integer` → `number`, enum gains a value)
+- Relax a constraint (e.g. reduce `minLength`, increase `maxBytes`)
+
+### Breaking Changes
+
+These changes require a new version (`v{N+1}:op.name`):
+
+- Remove or rename a field in `argsSchema` or `resultSchema`
+- Narrow a type (e.g. `number` → `integer`, enum loses a value)
+- Make an optional field required
+- Change the `executionModel` (e.g. `sync` → `async`)
+- Remove an accepted MIME type from `mediaSchema`
+
+When a breaking change is needed, introduce the new version (e.g. `v2:orders.getItem`) and deprecate the old version (e.g. `v1:orders.getItem`). Both versions coexist in the registry until the old version's sunset date.
+
+### Robustness Principle
+
+Callers MUST ignore unknown fields in response envelopes, result payloads, and stream frames. This ensures that additive server-side changes — new result fields, new envelope metadata — do not break existing callers.
 
 ---
 
@@ -644,7 +709,7 @@ Authentication is transport-aware. The core spec defines the `auth` shape; enfor
 
 Each operation is defined in code with:
 
-- `op` name
+- `op` name (version-prefixed: `v1:namespace.operation`)
 - argument schema (JSON Schema)
 - result schema (JSON Schema)
 - media schema (accepted attachments, for operations that accept media)
@@ -660,12 +725,15 @@ Each operation is defined in code with:
 - frame integrity flag (for streaming operations)
 - auth scopes
 - caching policy
+- deprecated flag (optional, defaults to `false`)
+- sunset date (ISO 8601 `YYYY-MM-DD`, present only when deprecated)
+- replacement operation name (present only when deprecated)
 
 ### Registry Entry Example
 
 ```json
 {
-  "op": "subscribeToStream",
+  "op": "v1:subscribeToStream",
   "argsSchema": { },
   "resultSchema": { },
   "frameSchema": { },
@@ -681,6 +749,30 @@ Each operation is defined in code with:
   "frameIntegrity": false
 }
 ```
+
+### Deprecated Registry Entry Example
+
+When an operation is deprecated, the registry entry includes `deprecated`, `sunset`, and `replacement`:
+
+```json
+{
+  "op": "v1:orders.getItem",
+  "argsSchema": { },
+  "resultSchema": { },
+  "sideEffecting": false,
+  "executionModel": "sync",
+  "authScopes": ["orders:read"],
+  "deprecated": true,
+  "sunset": "2026-06-01",
+  "replacement": "v2:orders.getItem"
+}
+```
+
+### Deprecation Fields
+
+- `deprecated` — Boolean, optional, defaults to `false`. When `true`, callers SHOULD migrate to the `replacement` operation.
+- `sunset` — ISO 8601 date (`YYYY-MM-DD`), present only when `deprecated` is `true`. The server MUST continue to serve the operation until this date. After the sunset date, the server MAY remove the operation and return `410 Gone` with an `OP_REMOVED` error.
+- `replacement` — The `op` name of the replacement operation (e.g. `v2:orders.getItem`), present only when `deprecated` is `true`.
 
 ### Fields
 
@@ -699,18 +791,39 @@ Each operation is defined in code with:
 GET /.well-known/ops
 ```
 
-Returns the full operation registry:
+Returns the full operation registry as a JSON object:
 
-- list of operations
+```json
+{
+  "callVersion": "2026-02-10",
+  "operations": [ ]
+}
+```
+
+### Top-Level Fields
+
+- `callVersion` — Required. Calendar date (`YYYY-MM-DD`) of the CALL specification version the server implements.
+- `operations` — Required. Array of registry entries describing every available operation.
+
+### Contents
+
+The registry includes:
+
+- list of operations (with version-prefixed names)
 - schemas (argument, result, frame, and media)
 - execution characteristics and models
 - supported transports and encodings
+- deprecation status, sunset dates, and replacements
 - limits and constraints
 
 This document is the canonical contract for:
 - frontend client generation
 - agent grounding
 - documentation
+
+### HTTP Caching
+
+Servers SHOULD include `Cache-Control` and `ETag` headers on `/.well-known/ops` responses. Clients SHOULD use conditional requests (`If-None-Match`) to avoid re-fetching an unchanged registry. Standard HTTP caching is sufficient — no custom hash fields are needed.
 
 ---
 
@@ -810,7 +923,7 @@ Authorization: Bearer eyJ...
 Content-Type: application/json
 
 {
-  "op": "device.readPosition",
+  "op": "v1:device.readPosition",
   "args": { "deviceId": "arm-joint-1" },
   "ctx": {
     "requestId": "550e8400-e29b-41d4-a716-446655440000",

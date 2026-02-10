@@ -20,7 +20,7 @@ POST /call
 
 ```json
 {
-  "op": "order.getItem",
+  "op": "v1:orders.getItem",
   "args": { "orderId": "456", "itemId": "789" },
   "ctx": { "requestId": "..." }
 }
@@ -36,6 +36,7 @@ That's it. A human developer can read it. An agent can call it. The operation na
 - **Session correlation** — `sessionId` and `parentId` for application-level grouping; `traceparent` for infrastructure observability
 - **Data integrity** — mandatory chunk checksums with chain validation; optional frame integrity for safety-critical streams
 - **Self-describing** — `GET /.well-known/ops` returns the full operation registry with schemas, execution models, and constraints. Agents ground themselves. Clients generate themselves
+- **Versioned operations** — version-prefixed names (`v1:orders.getItem`), additive-first evolution rules, and a deprecation lifecycle with contractual sunset dates
 - **Transport-aware auth** — HTTP uses headers, MQTT/Kafka use envelope auth, QUIC uses built-in TLS. One auth model, transport-specific enforcement
 
 ## Read More

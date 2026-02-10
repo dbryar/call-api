@@ -11,7 +11,7 @@ That chain of method calls exists for one reason: to reconstruct `GET /users/123
 Now look at the same intent in CALL:
 
 ```typescript
-const item = await call("order.getItem", { orderId: "456", itemId: "789" })
+const item = await call("v1:orders.getItem", { orderId: "456", itemId: "789" })
 ```
 
 One call. The operation name carries the intent. The arguments carry the data. There is nothing to reconstruct, nothing to translate, nothing to nest. The wire format IS the developer interface.
@@ -113,9 +113,10 @@ This returns the operation registry — schemas, execution models, auth requirem
 
 ```json
 {
+  "callVersion": "2026-02-10",
   "operations": [
     {
-      "op": "order.getItem",
+      "op": "v1:orders.getItem",
       "argsSchema": {
         "type": "object",
         "properties": {
@@ -134,10 +135,37 @@ This returns the operation registry — schemas, execution models, auth requirem
       },
       "executionModel": "sync",
       "sideEffecting": false,
+      "authScopes": ["orders:read"],
+      "deprecated": true,
+      "sunset": "2026-06-01",
+      "replacement": "v2:orders.getItem"
+    },
+    {
+      "op": "v2:orders.getItem",
+      "argsSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "string" },
+          "itemId": { "type": "string" },
+          "includeHistory": { "type": "boolean" }
+        },
+        "required": ["orderId", "itemId"]
+      },
+      "resultSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" },
+          "currency": { "type": "string" }
+        }
+      },
+      "executionModel": "sync",
+      "sideEffecting": false,
       "authScopes": ["orders:read"]
     },
     {
-      "op": "order.place",
+      "op": "v1:orders.place",
       "argsSchema": {
         "type": "object",
         "properties": {
@@ -167,14 +195,17 @@ From this, the entire typed "SDK" is generated:
 ```typescript
 // Auto-generated from /.well-known/ops
 
-export const order = {
-  getItem: (args: { orderId: string; itemId: string }) => call("order.getItem", args),
+export const orders = {
+  /** @deprecated Use orders.getItemV2 instead. Sunset: 2026-06-01 */
+  getItem: (args: { orderId: string; itemId: string }) => call("v1:orders.getItem", args),
 
-  place: (args: { items: OrderItem[]; shippingAddress: Address }) => call("order.place", args, { idempotencyKey: crypto.randomUUID() }),
+  getItemV2: (args: { orderId: string; itemId: string; includeHistory?: boolean }) => call("v2:orders.getItem", args),
+
+  place: (args: { items: OrderItem[]; shippingAddress: Address }) => call("v1:orders.place", args, { idempotencyKey: crypto.randomUUID() }),
 } as const
 ```
 
-The generated layer is optional. You can always call `call("order.getItem", { ... })` directly. The typed wrappers add type safety, but they are a convenience — a few lines of glue over the same single function.
+The generated layer is optional. You can always call `call("v2:orders.getItem", { ... })` directly. The typed wrappers add type safety, but they are a convenience — a few lines of glue over the same single function.
 
 ### IDE Autocomplete for Free
 
@@ -184,11 +215,16 @@ The registry response is JSON Schema. A codegen step that fetches `/.well-known/
 // Generated: call.d.ts
 
 type Operations = {
-  "order.getItem": {
+  /** @deprecated Use v2:orders.getItem instead. Sunset: 2026-06-01 */
+  "v1:orders.getItem": {
     args: { orderId: string; itemId: string }
     result: { name: string; quantity: number; price: number }
   }
-  "order.place": {
+  "v2:orders.getItem": {
+    args: { orderId: string; itemId: string; includeHistory?: boolean }
+    result: { name: string; quantity: number; price: number; currency: string }
+  }
+  "v1:orders.place": {
     args: { items: OrderItem[]; shippingAddress: Address }
     result: { orderId: string; estimatedDelivery: string }
   }
@@ -212,7 +248,7 @@ All three execution models start the same way: `POST /call`. The difference is i
 ```json
 // Request
 {
-  "op": "order.getItem",
+  "op": "v1:orders.getItem",
   "args": { "orderId": "456", "itemId": "789" },
   "ctx": { "requestId": "aaa-bbb-ccc" }
 }
@@ -232,7 +268,7 @@ One request. One response. `state` is `complete`. Read the `result`. Done.
 ```json
 // Request
 {
-  "op": "order.place",
+  "op": "v1:orders.place",
   "args": { "items": [{ "sku": "WIDGET-1", "quantity": 2 }], "shippingAddress": { "line1": "123 Main St" } },
   "ctx": {
     "requestId": "ddd-eee-fff",
@@ -274,7 +310,7 @@ The client's job is to wait and re-check. The `state` field tells it when to sto
 ```json
 // Request
 {
-  "op": "device.subscribePosition",
+  "op": "v1:device.subscribePosition",
   "args": { "deviceId": "arm-joint-1", "frequencyHz": 100 },
   "ctx": {
     "requestId": "ggg-hhh-iii",
@@ -302,7 +338,7 @@ The response hands back everything the client needs: transport, encoding, schema
 
 ```typescript
 const sub = await call(
-  "device.subscribePosition",
+  "v1:device.subscribePosition",
   {
     deviceId: "arm-joint-1",
     frequencyHz: 100,
@@ -335,7 +371,7 @@ const form = new FormData()
 form.append(
   "envelope",
   JSON.stringify({
-    op: "identity.verify",
+    op: "v1:identity.verify",
     args: {
       fullName: "Jane Smith",
       dateOfBirth: "1990-05-15",
@@ -365,7 +401,7 @@ Clean JSON. No multipart boundary handling.
 
 ```json
 {
-  "op": "identity.verify",
+  "op": "v1:identity.verify",
   "args": {
     "fullName": "Jane Smith",
     "dateOfBirth": "1990-05-15"
@@ -440,6 +476,35 @@ The server controls chunk size and cursor semantics. The client's job is to pull
 
 ---
 
+## Contract Evolution
+
+Operations change. Fields get added, schemas get restructured, execution models shift. CALL handles this with version-prefixed operation names and a deprecation lifecycle. See [Schema Evolution](specification.md#schema-evolution) for the full rules.
+
+### Additive Changes Are Free
+
+Adding an optional arg or a new result field is safe. Existing callers ignore fields they don't recognize. The operation stays `v1:orders.getItem` — no version bump needed.
+
+### Breaking Changes Create a New Version
+
+When a field is removed, renamed, or a type narrows, the server introduces a new version. Both appear in the registry:
+
+```
+v1:orders.getItem   → deprecated, sunset 2026-06-01
+v2:orders.getItem   → current
+```
+
+The old version keeps working until its sunset date. The new version is available immediately. Callers migrate on their own schedule.
+
+### Agents Pick the Highest Non-Deprecated Version
+
+An agent reading `/.well-known/ops` sees both versions. The convention is simple: pick the highest version that isn't deprecated. Codegen tools emit `@deprecated` annotations (as shown in the [generated SDK example above](#the-registry-is-your-sdk)), so human developers get IDE warnings too.
+
+### No Version Pinning
+
+There is no client-side version negotiation. The server serves the current registry. The client reads it and adapts. If `v1:orders.getItem` disappears after its sunset date, the client gets a `410` with the replacement name in the error payload. The registry is always current — no pinned SDK version to hold you back.
+
+---
+
 ## Auth: Transport-Aware, Client-Simple
 
 CALL auth adapts to the transport. The client does the natural thing for each context. See [Auth Model](specification.md#auth-model) for the full specification.
@@ -453,7 +518,7 @@ await fetch("https://api.example.com/call", {
     "Content-Type": "application/json",
     Authorization: "Bearer eyJ...",
   },
-  body: JSON.stringify({ op: "order.getItem", args: { orderId: "456", itemId: "789" } }),
+  body: JSON.stringify({ op: "v1:orders.getItem", args: { orderId: "456", itemId: "789" } }),
 })
 ```
 
@@ -461,7 +526,7 @@ await fetch("https://api.example.com/call", {
 
 ```json
 {
-  "op": "device.readSensor",
+  "op": "v1:device.readSensor",
   "args": { "sensorId": "temp-01" },
   "auth": {
     "iss": "auth.example.com",
@@ -476,7 +541,7 @@ await fetch("https://api.example.com/call", {
 **Streams** — the server issues short-lived credentials as part of the subscription response. The client consumes them and connects. No separate auth flow.
 
 ```typescript
-const sub = await call("device.subscribePosition", { deviceId: "arm-1" })
+const sub = await call("v1:device.subscribePosition", { deviceId: "arm-1" })
 // sub.stream.auth = { tokenType: "bearer", token: "short-lived-xyz", expiresAt: "..." }
 
 const ws = new WebSocket(sub.stream!.location, {
@@ -501,6 +566,7 @@ When stream credentials expire, the client re-subscribes. The server issues fres
 | Streaming                  | Separate WebSocket client, SSE handler, or polling abstraction   | `stream` object tells you where and how      |
 | Media upload               | Separate upload endpoint, presigned URL flow, multipart builders | `media` array on the same call               |
 | Codegen input              | OpenAPI spec (external artifact, can drift)                      | `/.well-known/ops` (live, canonical)         |
+| Versioning                 | URL path (`/v1/`, `/v2/`), header, or query param               | Version-prefixed op name with sunset dates   |
 | Package size               | Hundreds of generated classes                                    | One function                                 |
 
 A CALL client is less code because there is less to do. It is not a thin wrapper over a complex protocol. It is the direct expression of intent over a simple protocol. The thinness is the point.
