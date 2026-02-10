@@ -1,12 +1,12 @@
-# Unified Operation Invocation API Specification
+# CALL — Command And Lifecycle Layer
 
 ## Overview
 
-This specification defines a single, self-describing operation invocation API designed to serve both:
+CALL is a single, self-describing operation invocation API designed to serve both:
 - human-facing UI/frontends, and
-- LLM-powered agents (via a single `invoke` tool).
+- LLM-powered agents (via a single `call` tool).
 
-The API replaces endpoint-oriented REST design with an operation-based model using a uniform envelope.
+CALL replaces endpoint-oriented REST design with an operation-based model using a uniform envelope.
 The core specification is transport-agnostic; semantics are operation-driven. Transport-specific behavior is defined in the [Transport Bindings Appendix](#transport-bindings-appendix).
 
 The system supports:
@@ -49,7 +49,7 @@ The system supports:
 ### Endpoint
 
 ```
-POST /invoke
+POST /call
 ```
 
 ---
@@ -212,14 +212,14 @@ The spec supports three execution models. The operation registry declares which 
 
 ### Synchronous
 
-1. Caller sends `POST /invoke`
+1. Caller sends `POST /call`
 2. Server returns `200` with `state=complete` and `result`
 
 Used when the operation completes within the caller's `timeoutMs` hint.
 
 ### Asynchronous
 
-1. Caller sends `POST /invoke`
+1. Caller sends `POST /call`
 2. Server returns `202` with `state=accepted` and a `location` for polling
 3. Caller polls `GET /ops/{requestId}` until `state=complete` or `state=error`
 
@@ -227,7 +227,7 @@ Used for long-running operations.
 
 ### Stream Subscription
 
-1. Caller sends `POST /invoke` with a streaming operation (e.g. `op: "subscribeToStream"`)
+1. Caller sends `POST /call` with a streaming operation (e.g. `op: "subscribeToStream"`)
 2. Server returns `303` with the canonical response envelope containing the `stream` object
 3. Caller connects to `stream.location` using the specified `stream.transport`
 4. Frames arrive as raw encoded data — no envelope wrapping per frame
@@ -367,7 +367,7 @@ Operations that accept binary attachments (images, documents, audio, video) use 
 
 **Inline (multipart)** — The binary is sent as a part in a `multipart/form-data` request. The `media` entry references it by `part` name. The envelope JSON is sent as a part named `envelope`. This is the browser-native path — a standard `<form>` or `fetch` with `FormData` can construct it without any framework.
 
-**Reference (pre-uploaded)** — The binary is uploaded to an external object store beforehand (e.g. via a pre-signed URL). The `media` entry references it by `ref` URI. The invoke request is plain JSON. This is the natural path for agents and programmatic callers — no multipart overhead, just a clean JSON envelope.
+**Reference (pre-uploaded)** — The binary is uploaded to an external object store beforehand (e.g. via a pre-signed URL). The `media` entry references it by `ref` URI. The request is plain JSON. This is the natural path for agents and programmatic callers — no multipart overhead, just a clean JSON envelope.
 
 Each `media` entry uses exactly one of `part` or `ref`, never both.
 
@@ -376,7 +376,7 @@ Each `media` entry uses exactly one of `part` or `ref`, never both.
 The two delivery modes map naturally to the two audiences:
 
 - **Browsers and human-facing UIs** use **inline multipart**. Native `FormData`, native `<form>`, zero framework dependencies.
-- **Agents and programmatic callers** use **references**. Plain JSON, no multipart construction, no boundary handling. The agent uploads the file first (via a pre-signed URL or an upload operation), then sends a clean invoke with `ref` URIs.
+- **Agents and programmatic callers** use **references**. Plain JSON, no multipart construction, no boundary handling. The agent uploads the file first (via a pre-signed URL or an upload operation), then sends a clean call with `ref` URIs.
 
 Both paths produce the same `media` array on the envelope. The server handles them identically.
 
@@ -385,7 +385,7 @@ Both paths produce the same `media` array on the envelope. The server handles th
 A user submits a selfie, a bank statement PDF, and structured form data in a single invocation:
 
 ```
-POST /invoke HTTP/1.1
+POST /call HTTP/1.1
 Host: api.example.com
 Authorization: Bearer eyJ...
 Content-Type: multipart/form-data; boundary=----boundary
@@ -474,7 +474,7 @@ Agents discover media requirements via `/.well-known/ops` and can construct vali
 
 ### Subscription
 
-1. Caller sends `POST /invoke` with a streaming operation and relevant `args`
+1. Caller sends `POST /call` with a streaming operation and relevant `args`
 2. Server returns `303` with the canonical response envelope containing the `stream` object
 3. Caller connects to `stream.location` using the specified `stream.transport`
 4. Frames arrive as raw encoded data in the declared `encoding` and `schema` — no per-frame envelope overhead
@@ -482,7 +482,7 @@ Agents discover media requirements via `/.well-known/ops` and can construct vali
 ### During the Stream
 
 - Frames are raw bytes in the declared `encoding` and `schema`. No per-frame envelope wrapping. For high-frequency streams (e.g. a robot joint streaming position at 100Hz), every byte counts.
-- The stream is one-way: server to caller. If the caller needs to send commands back, that is a separate `POST /invoke` correlated via `sessionId`.
+- The stream is one-way: server to caller. If the caller needs to send commands back, that is a separate `POST /call` correlated via `sessionId`.
 - Multiple concurrent streams can share a `sessionId` (e.g. position, torque, and vision streams all part of one mission).
 
 ### Frame Integrity (Optional)
@@ -501,13 +501,13 @@ The operation registry MAY declare `frameIntegrity: true` to indicate that frame
 
 ### Termination
 
-- **Caller-initiated** — The caller invokes an `unsubscribeFromStream` operation, passing the stream's `sessionId` or `requestId`.
+- **Caller-initiated** — The caller calls an `unsubscribeFromStream` operation, passing the stream's `sessionId` or `requestId`.
 - **Server-initiated** — The server closes the transport channel. The caller should treat a closed channel as stream-ended and re-subscribe if needed.
 - **TTL expiry** — `stream.ttlSeconds` defines maximum stream lifetime. The server may close the stream after expiry. The caller can re-subscribe.
 
 ### Observability
 
-- The original `requestId` from the invoke call identifies the subscription.
+- The original `requestId` from the call identifies the subscription.
 - `ctx.traceparent` propagates through to the stream infrastructure for end-to-end tracing.
 - `ctx.sessionId` groups related streams and commands within the same application-level session.
 - The operation registry declares which ops return streams, so agents can discover streaming capabilities via `/.well-known/ops`.
@@ -689,7 +689,7 @@ This document is the canonical contract for:
 
 ## Agent Binding (MCP-like)
 
-- Single tool: `invoke`
+- Single tool: `call`
 - Input matches invocation request envelope
 - Output matches canonical response envelope
 - Agent retrieves capabilities via `/.well-known/ops`
@@ -722,7 +722,7 @@ This document is the canonical contract for:
 
 ## Summary
 
-This API defines:
+CALL defines:
 - one envelope
 - one invocation model
 - one result lifecycle (sync, async, or stream)
@@ -760,7 +760,7 @@ New transports can be added without modifying the core spec.
 The primary and reference binding.
 
 **Envelope mapping:**
-`POST /invoke` with JSON body (`application/json`). When the invocation includes inline media attachments, the request uses `multipart/form-data` with the envelope JSON in a part named `envelope` and binary attachments in named parts. Response is always JSON.
+`POST /call` with JSON body (`application/json`). When the invocation includes inline media attachments, the request uses `multipart/form-data` with the envelope JSON in a part named `envelope` and binary attachments in named parts. Response is always JSON.
 
 **Auth mechanism:**
 `Authorization` header. The envelope `auth` block is not used.
@@ -777,7 +777,7 @@ HTTP status codes map directly as defined in [HTTP Status Code Semantics](#http-
 **Example:**
 
 ```
-POST /invoke HTTP/1.1
+POST /call HTTP/1.1
 Host: api.example.com
 Authorization: Bearer eyJ...
 Content-Type: application/json
@@ -864,7 +864,7 @@ Transport errors (broker failures, consumer lag) are distinct from domain errors
 Real-time media and sensor streams between agents and devices.
 
 **Envelope mapping:**
-The invoke handshake happens over HTTP(S). The `stream` object in the response contains SDP offer/answer and ICE candidate details needed to establish the WebRTC connection.
+The handshake happens over HTTP(S). The `stream` object in the response contains SDP offer/answer and ICE candidate details needed to establish the WebRTC connection.
 
 **Auth mechanism:**
 Handled at the signaling layer (HTTP(S)). No envelope `auth` block needed — the stream connection inherits authorization from the signaling handshake.
@@ -882,7 +882,7 @@ Signaling errors use the canonical error model over HTTP(S). Transport errors du
 Multiplexed streams over a single connection for high-throughput, multi-stream scenarios.
 
 **Envelope mapping:**
-The invoke handshake happens over HTTP/3 (which runs on QUIC). Envelope as JSON or binary on the request stream.
+The handshake happens over HTTP/3 (which runs on QUIC). Envelope as JSON or binary on the request stream.
 
 **Auth mechanism:**
 TLS 1.3 is built into QUIC, providing transport-level encryption and authentication. Envelope `auth` block is optional for application-level caller identity when needed.
