@@ -38,9 +38,9 @@ That's it. A human developer can read it. An agent can call it. The operation na
 - **Self-describing** — `GET /.well-known/ops` returns the full operation registry with schemas, execution models, and constraints. Agents ground themselves. Clients generate themselves
 - **Transport-aware auth** — HTTP uses headers, MQTT/Kafka use envelope auth, QUIC uses built-in TLS. One auth model, transport-specific enforcement
 
-## Read the Spec
+## Read More
 
-The full specification is in [`specification.md`](specification.md).
+The full specification is in [`specification.md`](specification.md). For what this means on the client side — and why your REST SDK is apology code — see [`client.md`](client.md).
 
 ## Origin
 
