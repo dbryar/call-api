@@ -163,14 +163,18 @@ All successful protocol-level responses return this shape.
     "sessionId": "uuid",
     "ttlSeconds": 3600,
     "auth": {
-      "token": "string (short-lived)",
-      "expiresAt": "ISO 8601 timestamp"
+      "tokenType": "bearer | apiKey | otk",
+      "token": "string",
+      "expiresAt": "ISO 8601 timestamp (optional)"
     }
   },
-  "location": "string",
-  "locationAuth": {
-    "token": "string (short-lived)",
-    "expiresAt": "ISO 8601 timestamp"
+  "location": {
+    "uri": "string",
+    "auth": {
+      "tokenType": "bearer | apiKey | otk",
+      "token": "string",
+      "expiresAt": "ISO 8601 timestamp (optional)"
+    }
   },
   "retryAfterMs": 500
 }
@@ -204,19 +208,20 @@ All successful protocol-level responses return this shape.
   - `stream.sessionId` — Stream session identifier.
   - `stream.ttlSeconds` — How long the stream will remain available before the server may close it.
   - `stream.auth` — Optional. Short-lived credentials for authenticating to the stream endpoint. Present when `stream.location` requires authentication beyond what the transport provides natively.
-  - `stream.auth.token` — A short-lived bearer token or connection credential.
-  - `stream.auth.expiresAt` — ISO 8601 expiry timestamp. The caller MUST re-subscribe before this time to obtain fresh credentials.
+  - `stream.auth.tokenType` — Credential type: `bearer` (Authorization header), `apiKey` (query parameter or header), `otk` (one-time key consumed on first use).
+  - `stream.auth.token` — The credential value.
+  - `stream.auth.expiresAt` — Optional. ISO 8601 expiry timestamp. The caller MUST re-subscribe before this time to obtain fresh credentials. Omitted for one-time keys that have no time-based expiry.
 
 - `result`, `error`, and `stream` are mutually exclusive — exactly one is present depending on `state`.
 
 - `location`
-  Present when `state=accepted|pending`. Points to result retrieval endpoint. Also used for media redirects (303).
+  Present when the caller needs to retrieve a result or connect to a resource at a different endpoint. A self-describing object containing the target URI and optional auth. The server returns 303 only when the target is plain HTTP with no auth (client auto-follows). Otherwise the server returns 202 and the client reads the body to get the URI, auth, and any transport details.
 
-- `locationAuth`
-  Optional. Short-lived credentials for authenticating to the `location` endpoint. Present when the redirect target requires authentication (e.g. a private object store, a secured results endpoint). Omitted when the location uses pre-signed URLs or is publicly accessible.
-
-  - `locationAuth.token` — A short-lived bearer token.
-  - `locationAuth.expiresAt` — ISO 8601 expiry timestamp. The caller should retrieve the result before this time.
+  - `location.uri` — The target endpoint URI.
+  - `location.auth` — Optional. Short-lived credentials for the target. Omitted when the URI is pre-signed or publicly accessible.
+  - `location.auth.tokenType` — Credential type: `bearer`, `apiKey`, or `otk`.
+  - `location.auth.token` — The credential value.
+  - `location.auth.expiresAt` — Optional. ISO 8601 expiry timestamp.
 
 - `retryAfterMs`
   Optional hint for polling cadence.
@@ -245,8 +250,8 @@ Used for long-running operations.
 ### Stream Subscription
 
 1. Caller sends `POST /call` with a streaming operation (e.g. `op: "subscribeToStream"`)
-2. Server returns `303` with the canonical response envelope containing the `stream` object
-3. Caller connects to `stream.location` using the specified `stream.transport`
+2. Server returns `202` with the canonical response envelope containing the `stream` object (streams involve a transport change, so 303 auto-follow is not appropriate)
+3. Caller reads the `stream` object, connects to `stream.location` using the specified `stream.transport` and credentials if provided
 4. Frames arrive as raw encoded data — no envelope wrapping per frame
 
 Used for continuous data feeds (sensor telemetry, video, position tracking).
@@ -264,8 +269,8 @@ The system MUST return a descriptive payload whenever possible.
 | Status | Meaning |
 |------|--------|
 | 200 | Successful synchronous completion |
-| 202 | Accepted; result available later on same domain |
-| 303 | Result or stream available at alternate location (media redirect or stream subscription) |
+| 202 | Accepted — result available later, or resource available at a location requiring auth or a non-HTTP transport. The response body contains the `location` or `stream` object. Client MUST read the body before connecting |
+| 303 | Resource available at an unsecured HTTP location. No auth required, no transport change. Client may auto-follow the `Location` header |
 | 400 | Invalid operation — the request is malformed, the operation does not exist, or the arguments fail schema validation. The error payload describes why |
 | 401 | Authentication invalid |
 | 403 | Authentication valid but insufficient |
@@ -281,7 +286,8 @@ The system MUST return a descriptive payload whenever possible.
 - 404 responses on `/ops/{requestId}` or `/ops/{requestId}/chunks` indicate the operation instance has expired past its TTL or never existed. Callers should not retry.
 - HTTP 500 responses MUST include a full error payload and a panic/error code.
 - Zero-information 500 responses are forbidden.
-- 303 responses MUST include the canonical response envelope in the body (with either media or `stream` metadata).
+- 303 is reserved for plain HTTP redirects with no auth and no transport change (e.g. pre-signed S3 URL, public CDN). The `Location` header and `location.uri` carry the same URI.
+- 202 MUST be used instead of 303 when any of: auth is required, the target uses a non-HTTP transport (WebSocket, MQTT, QUIC, etc.), or the result is not yet ready. The caller reads the body and connects manually.
 
 ---
 
@@ -362,9 +368,9 @@ The API MUST NOT proxy or re-stream large media objects (audio/video).
 
 ### Media Flow
 
-1. Operation returns:
-   - `303 See Other`
-   - `Location: https://results.example.com/object`
+1. Operation returns either:
+   - `303 See Other` with `Location` header — when no auth is needed and the target is plain HTTP (e.g. pre-signed URL, public CDN). Client auto-follows.
+   - `202 Accepted` with `location` object — when credentials are needed or the target uses a non-HTTP transport. Client reads the body and connects manually.
 
 2. No envelope is returned at the redirected location.
 3. The redirected endpoint serves:
@@ -496,8 +502,8 @@ Agents discover media requirements via `/.well-known/ops` and can construct vali
 ### Subscription
 
 1. Caller sends `POST /call` with a streaming operation and relevant `args`
-2. Server returns `303` with the canonical response envelope containing the `stream` object
-3. Caller connects to `stream.location` using the specified `stream.transport`
+2. Server returns `202` with the `stream` object (streams involve a transport change)
+3. Caller reads the body, connects to `stream.location` using the specified `stream.transport` and credentials if provided
 4. Frames arrive as raw encoded data in the declared `encoding` and `schema` — no per-frame envelope overhead
 
 ### During the Stream
@@ -629,7 +635,7 @@ Authentication is transport-aware. The core spec defines the `auth` shape; enfor
 
 - The envelope `auth` block is always optional in the core spec.
 - Transport bindings declare whether it is required.
-- When a 303 redirect points to a secured endpoint, the response envelope includes short-lived credentials via `stream.auth` (for streams) or `locationAuth` (for media/results). See the [response envelope](#invocation-response-envelope-canonical) for field definitions.
+- The server returns 202 (not 303) when auth is required or the target uses a non-HTTP transport. Short-lived credentials are provided via `stream.auth` (for streams) or `location.auth` (for media/results). 303 is reserved for plain HTTP redirects with no auth and no transport change. See the [response envelope](#invocation-response-envelope-canonical) for field definitions.
 - The operation registry's `authScopes` field declares what permissions each operation requires, regardless of transport.
 
 ---
@@ -678,7 +684,7 @@ Each operation is defined in code with:
 
 ### Fields
 
-- `executionModel` — Declares how the operation executes: `sync` returns a result immediately, `async` returns a polling location, `stream` returns a 303 with stream metadata.
+- `executionModel` — Declares how the operation executes: `sync` returns a result immediately, `async` returns a polling location, `stream` returns 202 with stream metadata.
 - `frameSchema` — Schema describing each frame in a stream. Present only when `executionModel=stream`. Enables agents to understand frame structure before subscribing.
 - `supportedTransports` — Which transports a streaming operation can deliver over. The caller can express preference in `args`; the server picks the best match.
 - `supportedEncodings` — Which encodings are available for stream frames. Same negotiation as transports.
@@ -790,7 +796,7 @@ The primary and reference binding.
 Inline media uses `multipart/form-data` — browser-native via `<form>` or `fetch` with `FormData`. Pre-uploaded media uses plain JSON with `ref` URIs in the `media` array. See [Media Ingress](#media-ingress).
 
 **Stream support:**
-Stream subscriptions return `303` with the canonical response envelope. The `stream.location` points to an external stream endpoint. The HTTP binding is used only for the handshake; actual stream delivery is over the transport specified in `stream.transport`.
+Stream subscriptions return `202` (streams involve a transport change, so auto-follow is not appropriate). The `stream.location` points to an external stream endpoint. The HTTP binding is used only for the handshake; actual stream delivery is over the transport specified in `stream.transport`.
 
 **Error mapping:**
 HTTP status codes map directly as defined in [HTTP Status Code Semantics](#http-status-code-semantics).
