@@ -1,12 +1,12 @@
-# CALL — Command And Lifecycle Layer
+# OpenCALL — Open Command And Lifecycle Layer
 
 ## Overview
 
-CALL is a single, self-describing operation invocation API designed to serve both:
+OpenCALL is a single, self-describing operation invocation API designed to serve both:
 - human-facing UI/frontends, and
 - LLM-powered agents (via a single `call` tool).
 
-CALL replaces endpoint-oriented REST design with an operation-based model using a uniform envelope.
+OpenCALL replaces endpoint-oriented REST design with an operation-based model using a uniform envelope.
 The core specification is transport-agnostic; semantics are operation-driven. Transport-specific behavior is defined in the [Transport Bindings Appendix](#transport-bindings-appendix).
 
 The system supports:
@@ -802,7 +802,7 @@ Returns the full operation registry as a JSON object:
 
 ### Top-Level Fields
 
-- `callVersion` — Required. Calendar date (`YYYY-MM-DD`) of the CALL specification version the server implements.
+- `callVersion` — Required. Calendar date (`YYYY-MM-DD`) of the OpenCALL specification version the server implements.
 - `operations` — Required. Array of registry entries describing every available operation.
 
 ### Contents
@@ -862,7 +862,7 @@ Servers SHOULD include `Cache-Control` and `ETag` headers on `/.well-known/ops` 
 
 ## Summary
 
-CALL defines:
+OpenCALL defines:
 - one envelope
 - one invocation model
 - one result lifecycle (sync, async, or stream)

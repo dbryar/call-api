@@ -1,12 +1,12 @@
-# How CALL Compares
+# How OpenCALL Compares
 
-CALL overlaps with many things but replaces none of them wholesale. It shares structural DNA with JSON-RPC, architectural instincts with SOAP, and ambition with MCP. The question for each is the same: does it serve both humans and agents with one contract, across transports, with a built-in lifecycle?
+OpenCALL overlaps with many things but replaces none of them wholesale. It shares structural DNA with JSON-RPC, architectural instincts with SOAP, and ambition with MCP. The question for each is the same: does it serve both humans and agents with one contract, across transports, with a built-in lifecycle?
 
 ---
 
 ## JSON-RPC
 
-JSON-RPC is CALL's closest structural ancestor. Same spirit: a method name, a params object, an envelope, transport-agnostic by design. If you look at a CALL request and think "that's JSON-RPC," you're not wrong — you're just not seeing the rest.
+JSON-RPC is OpenCALL's closest structural ancestor. Same spirit: a method name, a params object, an envelope, transport-agnostic by design. If you look at an OpenCALL request and think "that's JSON-RPC," you're not wrong — you're just not seeing the rest.
 
 JSON-RPC deliberately limits its scope. The spec says so: "It is transport agnostic in that the concepts can be used within the same process, over sockets, over http, or in many various message passing environments. It uses JSON (RFC 4627) as data format." That's the entire ambition — a thin envelope for method dispatch.
 
@@ -21,7 +21,7 @@ What JSON-RPC does not define:
 - **Transport bindings.** Despite being "transport-agnostic," JSON-RPC defines no transport bindings. How does auth work over HTTP vs MQTT? How do you handle streaming over WebSocket vs QUIC? The spec is silent.
 - **Error model.** Integer error codes with a message string. The `-32xxx` range is reserved for protocol errors, leaving application errors to ad-hoc conventions. No structured `cause`, no domain error semantics.
 
-JSON-RPC is the envelope. CALL is the envelope plus the lifecycle, registry, auth, streaming, media, and transport bindings.
+JSON-RPC is the envelope. OpenCALL is the envelope plus the lifecycle, registry, auth, streaming, media, and transport bindings.
 
 ---
 
@@ -43,9 +43,9 @@ But GraphQL's strengths are also its constraints.
 
 **HTTP-bound in practice.** The spec is theoretically transport-agnostic, but the ecosystem assumes HTTP POST with a JSON body. Subscriptions assume WebSocket. Running GraphQL over MQTT or Kafka is not a real pattern.
 
-**Versioning is field-level, not operation-level.** GraphQL's `@deprecated` directive marks individual fields as deprecated with a `reason` string. This works for additive schemas where fields accumulate over time. But it cannot express a breaking schema change — a renamed field, a restructured type, a changed return shape. There is no concept of "v2 of this query." The convention is to never break the schema and keep adding fields forever, which works until it doesn't. CALL versions at the operation level: `v1:orders.getItem` and `v2:orders.getItem` coexist with independent schemas, and `v1` has a contractual sunset date.
+**Versioning is field-level, not operation-level.** GraphQL's `@deprecated` directive marks individual fields as deprecated with a `reason` string. This works for additive schemas where fields accumulate over time. But it cannot express a breaking schema change — a renamed field, a restructured type, a changed return shape. There is no concept of "v2 of this query." The convention is to never break the schema and keep adding fields forever, which works until it doesn't. OpenCALL versions at the operation level: `v1:orders.getItem` and `v2:orders.getItem` coexist with independent schemas, and `v1` has a contractual sunset date.
 
-GraphQL solves "I want different shapes of the same data." CALL solves "I want to invoke an operation and track its lifecycle."
+GraphQL solves "I want different shapes of the same data." OpenCALL solves "I want to invoke an operation and track its lifecycle."
 
 ---
 
@@ -67,20 +67,20 @@ The constraints show up at the edges.
 
 - **Thrift** (Meta) — Similar to gRPC but with declining adoption. Supports multiple serialization formats but lacks streaming and has a smaller modern ecosystem.
 - **Twirp** (Twitch) — Simpler than gRPC, works over HTTP 1.1, no streaming. A pragmatic choice that accepts smaller scope.
-- **Connect** (Buf) — The closest to CALL's philosophy in this category. Browser-compatible, supports streaming, works over HTTP 1.1 and 2. But still protobuf-first, no operation registry, no lifecycle model, no transport bindings beyond HTTP.
+- **Connect** (Buf) — The closest to OpenCALL's philosophy in this category. Browser-compatible, supports streaming, works over HTTP 1.1 and 2. But still protobuf-first, no operation registry, no lifecycle model, no transport bindings beyond HTTP.
 - **Cap'n Proto** — Zero-copy serialization with RPC. Exceptional performance for specific use cases. Niche adoption.
 
-**Version evolution relies on protobuf conventions.** Protobuf's wire format supports backward-compatible changes (adding fields, keeping field numbers stable), but this is a serialization property, not a protocol feature. There is no built-in deprecation lifecycle, no sunset dates, no registry that advertises which RPCs are deprecated or what replaces them. Developers manage version evolution through protobuf field numbering discipline and documentation. CALL makes evolution explicit: the registry advertises deprecated operations, their sunset dates, and their replacements.
+**Version evolution relies on protobuf conventions.** Protobuf's wire format supports backward-compatible changes (adding fields, keeping field numbers stable), but this is a serialization property, not a protocol feature. There is no built-in deprecation lifecycle, no sunset dates, no registry that advertises which RPCs are deprecated or what replaces them. Developers manage version evolution through protobuf field numbering discipline and documentation. OpenCALL makes evolution explicit: the registry advertises deprecated operations, their sunset dates, and their replacements.
 
-Binary RPC frameworks optimize for service-to-service performance. CALL optimizes for universal accessibility — JSON, any transport, any caller.
+Binary RPC frameworks optimize for service-to-service performance. OpenCALL optimizes for universal accessibility — JSON, any transport, any caller.
 
 ---
 
 ## SOAP
 
-SOAP is the comparison nobody wants to make and everybody is thinking. Operation-based? Envelope-wrapped? Self-describing via WSDL? Transport-agnostic in theory? That's CALL's architecture. The resemblance is not a coincidence — SOAP got the shape right.
+SOAP is the comparison nobody wants to make and everybody is thinking. Operation-based? Envelope-wrapped? Self-describing via WSDL? Transport-agnostic in theory? That's OpenCALL's architecture. The resemblance is not a coincidence — SOAP got the shape right.
 
-**What SOAP got right — and CALL keeps:**
+**What SOAP got right — and OpenCALL keeps:**
 
 - Operations, not resources. You call `PlaceOrder`, not `POST /orders`.
 - Single endpoint. No URL hierarchy to map.
@@ -97,7 +97,7 @@ SOAP is the comparison nobody wants to make and everybody is thinking. Operation
 - **Browser-hostile.** Constructing SOAP envelopes in JavaScript was painful. Parsing XML responses was painful. The browser ecosystem moved to JSON and never looked back.
 - **No agent story.** SOAP predated the agent era, but its architecture could have served agents well — if the wire format hadn't been XML and the spec stack hadn't been impenetrable.
 
-CALL is SOAP's architecture with JSON, a sane auth model, built-in async/streaming lifecycle, and no WS-\* stack.
+OpenCALL is SOAP's architecture with JSON, a sane auth model, built-in async/streaming lifecycle, and no WS-\* stack.
 
 ---
 
@@ -107,7 +107,7 @@ The Model Context Protocol is purpose-built for LLM-to-tool integration, and it 
 
 The problem is that it's only half the answer.
 
-**Agent-only.** MCP has no story for human-facing clients. There's no browser integration path, no UI binding, no concept of a frontend consuming the same contract. If you adopt MCP for agents and keep REST for humans, you're maintaining two protocols over the same business logic — the exact problem CALL exists to solve.
+**Agent-only.** MCP has no story for human-facing clients. There's no browser integration path, no UI binding, no concept of a frontend consuming the same contract. If you adopt MCP for agents and keep REST for humans, you're maintaining two protocols over the same business logic — the exact problem OpenCALL exists to solve.
 
 **Limited transport model.** MCP defines HTTP with SSE for streaming (the Streamable HTTP transport), with the original stdio transport for local processes. The SSE-based streaming approach was adopted after the initial SSE transport was deprecated within months of release — a sign of a transport model still finding its footing.
 
@@ -119,9 +119,9 @@ The problem is that it's only half the answer.
 
 **No chunk integrity.** No checksums, no chain validation, no data integrity mechanism for large result retrieval.
 
-**Rapid spec evolution.** The specification is still changing quickly. The original SSE transport was deprecated in favor of Streamable HTTP. Authorization is in draft. The registry concept (tool listing) is simpler than CALL's operation registry — no execution model declaration, no media schemas, no streaming transport negotiation.
+**Rapid spec evolution.** The specification is still changing quickly. The original SSE transport was deprecated in favor of Streamable HTTP. Authorization is in draft. The registry concept (tool listing) is simpler than OpenCALL's operation registry — no execution model declaration, no media schemas, no streaming transport negotiation.
 
-MCP solves "how does an agent call a tool." CALL solves "how does anyone — agent or human — invoke an operation across any transport."
+MCP solves "how does an agent call a tool." OpenCALL solves "how does anyone — agent or human — invoke an operation across any transport."
 
 ---
 
@@ -139,7 +139,7 @@ The scope is deliberately narrow.
 
 **HTTP-only.** A2A defines HTTP as its transport. There are no bindings for WebSocket, MQTT, Kafka, or QUIC.
 
-A2A + MCP + REST = three protocols. CALL = one.
+A2A + MCP + REST = three protocols. OpenCALL = one.
 
 ---
 
@@ -153,7 +153,7 @@ The industry standard for REST API description. Massive tooling ecosystem — Sw
 
 But OpenAPI describes REST; it doesn't fix REST. The generated SDK still maps classes to URL segments, methods to HTTP verbs, IDs to path parameters. The spec is a static artifact — a YAML or JSON file checked into a repo. It can drift from the implementation. It can be wrong. It can be out of date. And the codegen output is the REST SDK problem described in [`client.md`](client.md) — hundreds of generated classes that exist solely to reconstruct URLs.
 
-REST API versioning is notoriously inconsistent — URL path (`/v1/`, `/v2/`), custom headers (`Api-Version`), query parameters (`?version=2`), or content negotiation. OpenAPI describes whichever approach the API chose, but doesn't standardize one. CALL standardizes versioning in the operation name itself (`v1:orders.getItem`), with deprecation status and sunset dates in the registry.
+REST API versioning is notoriously inconsistent — URL path (`/v1/`, `/v2/`), custom headers (`Api-Version`), query parameters (`?version=2`), or content negotiation. OpenAPI describes whichever approach the API chose, but doesn't standardize one. OpenCALL standardizes versioning in the operation name itself (`v1:orders.getItem`), with deprecation status and sunset dates in the registry.
 
 OpenAPI is HTTP-only. There is no standard way to describe an MQTT or Kafka binding in an OpenAPI spec.
 
@@ -165,9 +165,9 @@ But AsyncAPI is a description format, not a protocol. It tells you what messages
 
 ### Smithy
 
-AWS's protocol-agnostic interface definition language. Separates the API model from the protocol binding — a Smithy model can generate clients for REST, gRPC, or any other protocol. The design philosophy is sound and could theoretically generate CALL clients. Smithy is complementary, not competing.
+AWS's protocol-agnostic interface definition language. Separates the API model from the protocol binding — a Smithy model can generate clients for REST, gRPC, or any other protocol. The design philosophy is sound and could theoretically generate OpenCALL clients. Smithy is complementary, not competing.
 
-**The common gap:** these tools describe APIs as external artifacts. CALL's [registry](specification.md#self-description-endpoint) _is_ the API description, served live by the application itself at `GET /.well-known/ops`. No artifact to drift. No version to pin. The contract is always current because the contract is the running service.
+**The common gap:** these tools describe APIs as external artifacts. OpenCALL's [registry](specification.md#self-description-endpoint) _is_ the API description, served live by the application itself at `GET /.well-known/ops`. No artifact to drift. No version to pin. The contract is always current because the contract is the running service.
 
 ---
 
@@ -177,15 +177,15 @@ CloudEvents is a CNCF graduated specification for describing events in a common 
 
 CloudEvents standardizes "something happened." It is a notification format, not an invocation protocol. There is no request-response model. No lifecycle. No registry. No streaming subscriptions. No auth model. No operation schemas.
 
-CALL and CloudEvents operate at different layers. A CALL operation could emit CloudEvents as side effects. A CloudEvents consumer could trigger CALL invocations. They are complementary.
+OpenCALL and CloudEvents operate at different layers. An OpenCALL operation could emit CloudEvents as side effects. A CloudEvents consumer could trigger OpenCALL invocations. They are complementary.
 
-CloudEvents standardizes event notifications. CALL standardizes operation invocations.
+CloudEvents standardizes event notifications. OpenCALL standardizes operation invocations.
 
 ---
 
 ## Real-Time Transports
 
-These are pipes, not protocols. They define how bytes move between endpoints. CALL defines what flows through the pipe.
+These are pipes, not protocols. They define how bytes move between endpoints. OpenCALL defines what flows through the pipe.
 
 **SSE (Server-Sent Events)** — Simple, browser-native, server-to-client text streaming over HTTP. No binary support. No bidirectional communication. No RPC semantics. MCP's adoption and subsequent deprecation of its SSE transport illustrates the limitation: SSE works for simple notification streams but buckles under the weight of a full protocol.
 
@@ -193,19 +193,19 @@ These are pipes, not protocols. They define how bytes move between endpoints. CA
 
 **WAMP (Web Application Messaging Protocol)** — Unified RPC and PubSub over WebSocket through a router. Architecturally interesting — the router-mediated model enables clean separation. But router-dependency adds infrastructure complexity, and the ecosystem remains small.
 
-**WebTransport** — Modern HTTP/3 transport supporting bidirectional streams, datagrams, and multiplexing without head-of-line blocking. This is what a CALL [QUIC binding](specification.md#quic-binding) could use underneath. It's a transport mechanism, not an application protocol.
+**WebTransport** — Modern HTTP/3 transport supporting bidirectional streams, datagrams, and multiplexing without head-of-line blocking. This is what an OpenCALL [QUIC binding](specification.md#quic-binding) could use underneath. It's a transport mechanism, not an application protocol.
 
-These are transports. CALL defines what flows through the transport — the [envelope](specification.md#invocation-request-envelope), the [lifecycle](specification.md#execution-models), the [registry](specification.md#self-description-endpoint).
+These are transports. OpenCALL defines what flows through the transport — the [envelope](specification.md#invocation-request-envelope), the [lifecycle](specification.md#execution-models), the [registry](specification.md#self-description-endpoint).
 
 ---
 
 ## Patterns Often Confused with Protocols
 
-These are architectural patterns or conventions, not wire protocols. They operate at a different layer than CALL.
+These are architectural patterns or conventions, not wire protocols. They operate at a different layer than OpenCALL.
 
-**CQRS (Command Query Responsibility Segregation)** — A backend architectural pattern that separates read and write models. CALL is CQRS-compatible by design: the caller doesn't distinguish command from query; the `op` name carries intent and the server routes internally. A CALL server can implement CQRS without the caller knowing or caring. Different layers.
+**CQRS (Command Query Responsibility Segregation)** — A backend architectural pattern that separates read and write models. OpenCALL is CQRS-compatible by design: the caller doesn't distinguish command from query; the `op` name carries intent and the server routes internally. An OpenCALL server can implement CQRS without the caller knowing or caring. Different layers.
 
-**HATEOAS (Hypermedia as the Engine of Application State)** — The "pure REST" ideal where responses contain links to available actions, enabling clients to navigate the API by following hyperlinks. The theory is elegant. In practice, it was broadly rejected — no working generic HATEOAS client exists that can navigate an arbitrary API without prior knowledge. HATEOAS is response-level discovery; CALL provides [catalog-level discovery](specification.md#self-description-endpoint) via `/.well-known/ops`, where every operation and its schema are available upfront.
+**HATEOAS (Hypermedia as the Engine of Application State)** — The "pure REST" ideal where responses contain links to available actions, enabling clients to navigate the API by following hyperlinks. The theory is elegant. In practice, it was broadly rejected — no working generic HATEOAS client exists that can navigate an arbitrary API without prior knowledge. HATEOAS is response-level discovery; OpenCALL provides [catalog-level discovery](specification.md#self-description-endpoint) via `/.well-known/ops`, where every operation and its schema are available upfront.
 
 **OData** — Standardized REST conventions with a query language for filtering, sorting, and paging. Adds consistency to REST APIs, particularly in the Microsoft and SAP ecosystems. But it inherits all of REST's limitations — HTTP-only, resource-oriented, verb-mapped — and adds its own complexity. Limited adoption outside enterprise environments.
 
@@ -217,4 +217,4 @@ OpenAI's function calling, Anthropic's tool use, Google's function declarations 
 
 These formats define how an LLM selects and parameterizes a function call. They do not define how that call is transmitted to a service, how the service responds, how long-running operations are tracked, or how streams are established. The LLM generates `{"name": "get_weather", "arguments": {"city": "Sydney"}}` — but something still needs to deliver that call to a service and handle the response lifecycle.
 
-LLM function calling is tool selection. CALL is [service invocation](specification.md#operation-invocation-endpoint). A CALL [registry](specification.md#self-description-endpoint) can feed LLM function calling directly — the operation schemas at `/.well-known/ops` are JSON Schema, exactly what these formats consume. The LLM picks the operation; CALL delivers it.
+LLM function calling is tool selection. OpenCALL is [service invocation](specification.md#operation-invocation-endpoint). An OpenCALL [registry](specification.md#self-description-endpoint) can feed LLM function calling directly — the operation schemas at `/.well-known/ops` are JSON Schema, exactly what these formats consume. The LLM picks the operation; OpenCALL delivers it.

@@ -8,7 +8,7 @@ const item = await client.users(userId).orders(orderId).items(itemId).get()
 
 That chain of method calls exists for one reason: to reconstruct `GET /users/123/orders/456/items/789`. The SDK maps classes to URL segments, methods to HTTP verbs, and IDs to path parameters. It is a translation layer that turns developer intent into a resource path and then sends it over the wire.
 
-Now look at the same intent in CALL:
+Now look at the same intent in OpenCALL:
 
 ```typescript
 const item = await call("v1:orders.getItem", { orderId: "456", itemId: "789" })
@@ -38,13 +38,13 @@ Here's the irony: REST was supposed to be "human-readable" because URLs are read
 
 The SDK is the apology. "Sorry our wire format is hostile. Here's a wrapper that makes it feel like a normal function call."
 
-CALL skips the apology.
+OpenCALL skips the apology.
 
 ---
 
-## A CALL Client Is One Function
+## An OpenCALL Client Is One Function
 
-Here is a complete CALL client:
+Here is a complete OpenCALL client:
 
 ```typescript
 type CallResponse = {
@@ -95,7 +95,7 @@ async function call(
 
 That is the entire client. Not a module. Not a package with hundreds of generated classes, one per resource, each with methods mapping to HTTP verbs. One function. It wraps intent in an envelope and sends it.
 
-REST SDKs are big because REST has a big translation surface. CALL clients are small because there is no translation.
+REST SDKs are big because REST has a big translation surface. OpenCALL clients are small because there is no translation.
 
 ---
 
@@ -103,7 +103,7 @@ REST SDKs are big because REST has a big translation surface. CALL clients are s
 
 REST APIs use OpenAPI specs to describe their surface, and then a codegen tool generates an SDK from that spec. The SDK is an intermediary artifact between the spec and the caller. It can drift. It can be wrong. It can be out of date.
 
-CALL uses a live registry:
+OpenCALL uses a live registry:
 
 ```
 GET /.well-known/ops
@@ -478,7 +478,7 @@ The server controls chunk size and cursor semantics. The client's job is to pull
 
 ## Contract Evolution
 
-Operations change. Fields get added, schemas get restructured, execution models shift. CALL handles this with version-prefixed operation names and a deprecation lifecycle. See [Schema Evolution](specification.md#schema-evolution) for the full rules.
+Operations change. Fields get added, schemas get restructured, execution models shift. OpenCALL handles this with version-prefixed operation names and a deprecation lifecycle. See [Schema Evolution](specification.md#schema-evolution) for the full rules.
 
 ### Additive Changes Are Free
 
@@ -507,7 +507,7 @@ There is no client-side version negotiation. The server serves the current regis
 
 ## Auth: Transport-Aware, Client-Simple
 
-CALL auth adapts to the transport. The client does the natural thing for each context. See [Auth Model](specification.md#auth-model) for the full specification.
+OpenCALL auth adapts to the transport. The client does the natural thing for each context. See [Auth Model](specification.md#auth-model) for the full specification.
 
 **HTTP** — auth goes in the header. No `auth` block in the envelope.
 
@@ -555,7 +555,7 @@ When stream credentials expire, the client re-subscribes. The server issues fres
 
 ## Less Code, Not More
 
-| Concern                    | REST SDK                                                         | CALL Client                                  |
+| Concern                    | REST SDK                                                         | OpenCALL Client                              |
 | -------------------------- | ---------------------------------------------------------------- | -------------------------------------------- |
 | URL construction           | Class hierarchy mapping to path segments                         | None — `op` is a string                      |
 | Verb selection             | Method names mapped to HTTP verbs                                | None — always `POST /call`                   |
@@ -569,7 +569,7 @@ When stream credentials expire, the client re-subscribes. The server issues fres
 | Versioning                 | URL path (`/v1/`, `/v2/`), header, or query param               | Version-prefixed op name with sunset dates   |
 | Package size               | Hundreds of generated classes                                    | One function                                 |
 
-A CALL client is less code because there is less to do. It is not a thin wrapper over a complex protocol. It is the direct expression of intent over a simple protocol. The thinness is the point.
+An OpenCALL client is less code because there is less to do. It is not a thin wrapper over a complex protocol. It is the direct expression of intent over a simple protocol. The thinness is the point.
 
 ---
 
@@ -577,6 +577,6 @@ A CALL client is less code because there is less to do. It is not a thin wrapper
 
 REST SDKs exist because REST forced a gap between intent and wire format. Every SDK is a bridge across that gap. Every fluent API is a confession that the resource-oriented wire format was never meant for developers.
 
-CALL closes the gap. The operation name is the intent. The envelope is the wire format. The registry is the contract. There is nothing in between.
+OpenCALL closes the gap. The operation name is the intent. The envelope is the wire format. The registry is the contract. There is nothing in between.
 
 Your SDK was always just an apology for your API. Stop apologizing.
