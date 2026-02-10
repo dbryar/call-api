@@ -24,12 +24,31 @@ Tests import the TypeScript API's `createServer()` function, start it in `before
 API_URL=http://localhost:3000 AUTH_TOKEN=<token> bun test
 ```
 
-### Docker Testing
+### Docker Testing (all four languages)
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build -d
-API_URL=http://localhost:3000 AUTH_TOKEN=<token> bun test
+
+# Register tokens on all servers
+for port in 3001 3002 3003 3004; do
+  curl -s -X POST http://localhost:$port/_internal/tokens \
+    -H "Content-Type: application/json" \
+    -d '{"token":"my-token","scopes":["todos:read","todos:write","reports:read"]}'
+done
+
+# Run tests against each language
+API_URL=http://localhost:3001 AUTH_TOKEN=my-token bun test  # TypeScript
+API_URL=http://localhost:3002 AUTH_TOKEN=my-token bun test  # Python
+API_URL=http://localhost:3003 AUTH_TOKEN=my-token bun test  # Java
+API_URL=http://localhost:3004 AUTH_TOKEN=my-token bun test  # Go
 ```
+
+| Service | Port | Language | Framework |
+|---------|------|----------|-----------|
+| todo-typescript | 3001 | TypeScript | Bun |
+| todo-python | 3002 | Python | FastAPI |
+| todo-java | 3003 | Java | Javalin |
+| todo-go | 3004 | Go | Gin |
 
 ### Python API
 
@@ -37,14 +56,40 @@ API_URL=http://localhost:3000 AUTH_TOKEN=<token> bun test
 cd api/python
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 3001 &
+uvicorn app.main:app --host 0.0.0.0 --port 3002 &
 
-# Register a token, then run tests
-curl -X POST http://localhost:3001/_internal/tokens \
+curl -X POST http://localhost:3002/_internal/tokens \
   -H "Content-Type: application/json" \
   -d '{"token":"my-token","scopes":["todos:read","todos:write","reports:read"]}'
 
-API_URL=http://localhost:3001 AUTH_TOKEN=my-token bun test
+API_URL=http://localhost:3002 AUTH_TOKEN=my-token bun test
+```
+
+### Java API
+
+```bash
+cd api/java
+gradle shadowJar --no-daemon
+java -jar build/libs/app.jar &  # starts on port 3000
+
+curl -X POST http://localhost:3000/_internal/tokens \
+  -H "Content-Type: application/json" \
+  -d '{"token":"my-token","scopes":["todos:read","todos:write","reports:read"]}'
+
+API_URL=http://localhost:3000 AUTH_TOKEN=my-token bun test
+```
+
+### Go API
+
+```bash
+cd api/go
+go build -o server . && ./server &  # starts on port 3000
+
+curl -X POST http://localhost:3000/_internal/tokens \
+  -H "Content-Type: application/json" \
+  -d '{"token":"my-token","scopes":["todos:read","todos:write","reports:read"]}'
+
+API_URL=http://localhost:3000 AUTH_TOKEN=my-token bun test
 ```
 
 ## Test Coverage
@@ -123,21 +168,41 @@ tests/
 │   │       ├── auth.ts       # Token validation
 │   │       ├── state.ts      # Async operation state machine
 │   │       └── media.ts      # Media blob storage
-│   └── python/               # Python implementation (FastAPI)
-│       ├── requirements.txt
+│   ├── python/               # Python implementation (FastAPI)
+│   │   ├── requirements.txt
+│   │   ├── Dockerfile
+│   │   └── app/
+│   │       ├── main.py       # FastAPI app + routes
+│   │       ├── schemas.py    # Type hints
+│   │       ├── operations.py # Handlers + in-memory store
+│   │       ├── registry.py   # Registry builder
+│   │       ├── router.py     # Envelope dispatch
+│   │       ├── auth.py       # Token validation
+│   │       ├── state.py      # Async state machine
+│   │       └── media.py      # Media storage
+│   ├── java/                 # Java implementation (Javalin)
+│   │   ├── build.gradle
+│   │   ├── Dockerfile
+│   │   └── src/main/java/opencall/
+│   │       ├── App.java      # Javalin server + routes
+│   │       ├── Operations.java # Handlers + in-memory store
+│   │       ├── Registry.java # Registry builder
+│   │       ├── Router.java   # Envelope dispatch
+│   │       ├── Auth.java     # Token validation
+│   │       ├── State.java    # Async state machine
+│   │       └── Media.java    # Media storage
+│   └── go/                   # Go implementation (Gin)
+│       ├── go.mod
 │       ├── Dockerfile
-│       └── app/
-│           ├── main.py       # FastAPI app + routes
-│           ├── schemas.py    # Type hints
-│           ├── operations.py # Handlers + in-memory store
-│           ├── registry.py   # Registry builder
-│           ├── router.py     # Envelope dispatch
-│           ├── auth.py       # Token validation
-│           ├── state.py      # Async state machine
-│           └── media.py      # Media storage
+│       ├── main.go           # Gin server + routes
+│       ├── operations.go     # Handlers + in-memory store
+│       ├── registry.go       # Registry builder
+│       ├── router.go         # Envelope dispatch
+│       ├── auth.go           # Token validation
+│       ├── state.go          # Async state machine
+│       └── media.go          # Media storage
 └── docker/
-    ├── docker-compose.yml
-    └── .env.example
+    └── docker-compose.yml
 ```
 
 ## Adding a New Language Implementation
