@@ -161,9 +161,17 @@ All successful protocol-level responses return this shape.
     "schema": "string",
     "location": "string (URI)",
     "sessionId": "uuid",
-    "ttlSeconds": 3600
+    "ttlSeconds": 3600,
+    "auth": {
+      "token": "string (short-lived)",
+      "expiresAt": "ISO 8601 timestamp"
+    }
   },
   "location": "string",
+  "locationAuth": {
+    "token": "string (short-lived)",
+    "expiresAt": "ISO 8601 timestamp"
+  },
   "retryAfterMs": 500
 }
 ```
@@ -195,11 +203,20 @@ All successful protocol-level responses return this shape.
   - `stream.location` — URI of the stream endpoint to connect to.
   - `stream.sessionId` — Stream session identifier.
   - `stream.ttlSeconds` — How long the stream will remain available before the server may close it.
+  - `stream.auth` — Optional. Short-lived credentials for authenticating to the stream endpoint. Present when `stream.location` requires authentication beyond what the transport provides natively.
+  - `stream.auth.token` — A short-lived bearer token or connection credential.
+  - `stream.auth.expiresAt` — ISO 8601 expiry timestamp. The caller MUST re-subscribe before this time to obtain fresh credentials.
 
 - `result`, `error`, and `stream` are mutually exclusive — exactly one is present depending on `state`.
 
 - `location`
-  Present when `state=accepted|pending`. Points to result retrieval endpoint.
+  Present when `state=accepted|pending`. Points to result retrieval endpoint. Also used for media redirects (303).
+
+- `locationAuth`
+  Optional. Short-lived credentials for authenticating to the `location` endpoint. Present when the redirect target requires authentication (e.g. a private object store, a secured results endpoint). Omitted when the location uses pre-signed URLs or is publicly accessible.
+
+  - `locationAuth.token` — A short-lived bearer token.
+  - `locationAuth.expiresAt` — ISO 8601 expiry timestamp. The caller should retrieve the result before this time.
 
 - `retryAfterMs`
   Optional hint for polling cadence.
@@ -249,15 +266,19 @@ The system MUST return a descriptive payload whenever possible.
 | 200 | Successful synchronous completion |
 | 202 | Accepted; result available later on same domain |
 | 303 | Result or stream available at alternate location (media redirect or stream subscription) |
+| 400 | Invalid operation — the request is malformed, the operation does not exist, or the arguments fail schema validation. The error payload describes why |
 | 401 | Authentication invalid |
 | 403 | Authentication valid but insufficient |
+| 404 | Resource not found — the requested operation result, chunk, or media object does not exist or has expired |
 | 500 | Internal failure with full error payload |
 | 502 | Upstream dependency failure |
 | 503 | Service unavailable |
 
 ### Notes
 
-- Domain errors MUST be represented using `state=error`, not HTTP 4xx.
+- Domain errors MUST be represented using `state=error`, not HTTP 4xx. The 400 and 404 codes are reserved for protocol-level failures (bad requests and missing resources), not business logic errors.
+- 400 responses MUST include the canonical error envelope describing the validation failure (e.g. unknown operation, missing required arguments, schema mismatch).
+- 404 responses on `/ops/{requestId}` or `/ops/{requestId}/chunks` indicate the operation instance has expired past its TTL or never existed. Callers should not retry.
 - HTTP 500 responses MUST include a full error payload and a panic/error code.
 - Zero-information 500 responses are forbidden.
 - 303 responses MUST include the canonical response envelope in the body (with either media or `stream` metadata).
@@ -608,7 +629,7 @@ Authentication is transport-aware. The core spec defines the `auth` shape; enfor
 
 - The envelope `auth` block is always optional in the core spec.
 - Transport bindings declare whether it is required.
-- When a stream is established via a 303 redirect, the `stream` object may include a short-lived token for authenticating the subsequent transport connection.
+- When a 303 redirect points to a secured endpoint, the response envelope includes short-lived credentials via `stream.auth` (for streams) or `locationAuth` (for media/results). See the [response envelope](#invocation-response-envelope-canonical) for field definitions.
 - The operation registry's `authScopes` field declares what permissions each operation requires, regardless of transport.
 
 ---
