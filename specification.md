@@ -279,7 +279,9 @@ GET /ops/{requestId}/chunks?cursor={cursor}
   "cursor": "string",
   "chunk": {
     "offset": 0,
-    "length": 1048576
+    "length": 1048576,
+    "checksum": "sha256:a1b2c3d4...",
+    "checksumPrevious": null
   },
   "total": 536870912,
   "data": "base64 or binary"
@@ -296,6 +298,12 @@ GET /ops/{requestId}/chunks?cursor={cursor}
 
 - `chunk.length`
   Size of this chunk.
+
+- `chunk.checksum`
+  SHA-256 hash of this chunk's `data` payload. The receiver MUST verify this before accepting the chunk. Format: `sha256:{hex}`.
+
+- `chunk.checksumPrevious`
+  SHA-256 hash of the immediately preceding chunk's `data` payload — a single value, not a cumulative list. `null` for the first chunk. Enables the receiver to verify that chunks are consumed in order and detect gaps during reassembly.
 
 - `total`
   Total size if known; omitted if unknown.
@@ -350,6 +358,20 @@ The API MUST NOT proxy or re-stream large media objects (audio/video).
 - The stream is one-way: server to caller. If the caller needs to send commands back, that is a separate `POST /invoke` correlated via `sessionId`.
 - Multiple concurrent streams can share a `sessionId` (e.g. position, torque, and vision streams all part of one mission).
 
+### Frame Integrity (Optional)
+
+For streams where data integrity must be verified above the transport layer, the server MAY prepend a lightweight integrity header to each frame. The format is transport-binding specific, but the logical fields are:
+
+- `seq` — Monotonically increasing frame sequence number
+- `checksum` — Hash of the frame payload (e.g. CRC-32 for low-latency, SHA-256 for high-assurance)
+
+Frame integrity is optional because most stream transports (QUIC, TLS-over-WebSocket, MQTT with QoS 1+) already provide delivery guarantees. It is recommended for:
+- Untrusted or lossy transport layers
+- Safety-critical applications (robotics actuation, medical devices)
+- Scenarios where the consumer must detect gaps in the frame sequence
+
+The operation registry MAY declare `frameIntegrity: true` to indicate that frames for a given operation include integrity headers.
+
 ### Termination
 
 - **Caller-initiated** — The caller invokes an `unsubscribeFromStream` operation, passing the stream's `sessionId` or `requestId`.
@@ -397,6 +419,28 @@ The API MUST NOT proxy or re-stream large media objects (audio/video).
   }
 }
 ```
+
+---
+
+## Data Integrity
+
+### Chunk Integrity (Pull-Based)
+
+Pull-based chunked retrieval MUST include per-chunk checksums (`chunk.checksum`) and chain validation (`chunk.checksumPrevious`). This is not optional — when a caller is reassembling a file or dataset from chunks, integrity verification is essential. See [Chunked Result Retrieval](#chunked-result-retrieval-pull-based-streaming) for the field definitions.
+
+### Frame Integrity (Push-Based Streams)
+
+Push-based stream frames MAY include lightweight integrity headers. This is optional and declared per-operation in the registry via `frameIntegrity: true`. See [Frame Integrity](#frame-integrity-optional) for details.
+
+### Response Signing
+
+The core spec does not define response signing at the envelope level. Response authenticity and integrity are transport-layer concerns:
+
+- **HTTP(S)** — TLS provides transport integrity. For additional assurance, implementers can use HTTP Message Signatures ([RFC 9421](https://www.rfc-editor.org/rfc/rfc9421)) or mTLS for mutual authentication.
+- **QUIC** — TLS 1.3 is built in.
+- **MQTT/Kafka** — TLS on the broker connection.
+
+When security requirements demand end-to-end response signing beyond transport guarantees (e.g. non-repudiation, offline verification, multi-hop relay scenarios), implementers SHOULD use HTTP Message Signatures or equivalent mechanisms at the transport binding layer rather than adding signing fields to the canonical envelope.
 
 ---
 
@@ -458,6 +502,7 @@ Each operation is defined in code with:
 - supported transports (for streaming operations)
 - supported encodings (for streaming operations)
 - default stream TTL (for streaming operations)
+- frame integrity flag (for streaming operations)
 - auth scopes
 - caching policy
 
@@ -477,7 +522,8 @@ Each operation is defined in code with:
   "supportedEncodings": ["protobuf", "json"],
   "authScopes": ["device:read"],
   "cachingPolicy": "none",
-  "ttlSeconds": 3600
+  "ttlSeconds": 3600,
+  "frameIntegrity": false
 }
 ```
 
@@ -488,6 +534,7 @@ Each operation is defined in code with:
 - `supportedTransports` — Which transports a streaming operation can deliver over. The caller can express preference in `args`; the server picks the best match.
 - `supportedEncodings` — Which encodings are available for stream frames. Same negotiation as transports.
 - `ttlSeconds` — Default stream lifetime for this operation.
+- `frameIntegrity` — Whether stream frames include integrity headers (sequence number and checksum). Defaults to `false`. Recommended for safety-critical applications.
 
 ---
 
