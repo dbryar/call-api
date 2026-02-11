@@ -25,6 +25,7 @@ type operationInstance struct {
 	Error        map[string]interface{}
 	RetryAfterMs int
 	CreatedAt    string
+	ExpiresAt    string
 	Chunks       []chunk
 }
 
@@ -40,6 +41,7 @@ func createInstance(requestID string, op string) *operationInstance {
 		State:        "accepted",
 		RetryAfterMs: 100,
 		CreatedAt:    time.Now().UTC().Format(time.RFC3339Nano),
+		ExpiresAt:    time.Now().Add(3600 * time.Second).UTC().Format("2006-01-02T15:04:05.000Z"),
 	}
 	// Normalize to Z suffix
 	instance.CreatedAt = normalizeISOTime(instance.CreatedAt)

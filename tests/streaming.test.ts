@@ -22,6 +22,13 @@ describe("Streaming (REQ-STREAM)", () => {
     expect(body.stream!.transport).toBe("wss");
   });
 
+  test("streaming response includes stream.expiresAt as ISO 8601 timestamp", async () => {
+    const { body } = await call("v1:todos.watch", {});
+    expect(body.stream).toBeDefined();
+    expect(body.stream!.expiresAt).toBeTruthy();
+    expect(body.stream!.expiresAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
   test("stream.encoding is json", async () => {
     const { body } = await call("v1:todos.watch", {});
     expect(body.stream!.encoding).toBe("json");

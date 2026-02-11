@@ -80,4 +80,10 @@ describe("Async Execution (REQ-ASYNC)", () => {
     expect(status).toBe(401);
     expect(body.state).toBe("error");
   });
+
+  test("202 response includes expiresAt timestamp", async () => {
+    const { body } = await call("v1:todos.export", { format: "csv" });
+    expect(body.expiresAt).toBeTruthy();
+    expect(body.expiresAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
 });

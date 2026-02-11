@@ -60,10 +60,11 @@ type CallResponse = {
     schema: string
     location: string
     sessionId: string
-    ttlSeconds: number
+    expiresAt?: string
     auth?: { tokenType: string; token: string; expiresAt?: string }
   }
   retryAfterMs?: number
+  expiresAt?: string
 }
 
 async function call(
@@ -329,12 +330,12 @@ The client's job is to wait and re-check. The `state` field tells it when to sto
     "schema": "device.PositionFrame",
     "location": "wss://streams.example.com/s/ggg-hhh-iii",
     "sessionId": "mission-001",
-    "ttlSeconds": 3600
+    "expiresAt": "2026-02-11T15:00:00Z"
   }
 }
 ```
 
-The response hands back everything the client needs: transport, encoding, schema, location, session ID, TTL. The client reads the `stream` object and connects:
+The response hands back everything the client needs: transport, encoding, schema, location, session ID, expiry. The client reads the `stream` object and connects:
 
 ```typescript
 const sub = await call(
