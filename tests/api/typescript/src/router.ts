@@ -20,8 +20,8 @@ interface CallResponse {
   result?: unknown;
   error?: { code: string; message: string; cause?: Record<string, unknown> };
   retryAfterMs?: number;
-  expiresAt?: string;
-  stream?: { transport: string; location: string; sessionId: string; encoding: string; expiresAt?: string };
+  expiresAt?: number;
+  stream?: { transport: string; location: string; sessionId: string; encoding: string; expiresAt?: number };
 }
 
 export function handleCall(
@@ -140,7 +140,7 @@ export function handleCall(
             location: `/streams/${streamResult.sessionId}`,
             sessionId: streamResult.sessionId,
             encoding: "json",
-            expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
           },
         },
       };
@@ -161,7 +161,7 @@ export function handleCall(
           ...base,
           state: "accepted",
           retryAfterMs: 100,
-          expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
         },
       };
     }

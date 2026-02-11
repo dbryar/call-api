@@ -35,7 +35,7 @@ That's it. A human developer can read it. An agent can call it. The operation na
 - **Media ingress and egress** — browsers upload files via native multipart; agents use pre-signed URIs. Large media redirects via 303, never proxied
 - **Session correlation** — `sessionId` and `parentId` for application-level grouping; `traceparent` for infrastructure observability
 - **Data integrity** — mandatory chunk checksums with chain validation; optional frame integrity for safety-critical streams
-- **Result retention** — async responses include `expiresAt` so clients and agents know when results expire. No surprise 404s
+- **Result retention** — async responses include `expiresAt` (Unix epoch seconds) so clients and agents know when results expire. No surprise 404s
 - **Self-describing** — `GET /.well-known/ops` returns the full operation registry with schemas, execution models, and constraints. Agents ground themselves. Clients generate themselves
 - **Code-generated registry** — the operation registry at `/.well-known/ops` is designed to be generated from source code annotations (JSDoc, decorators, doc comments), not hand-maintained. Multi-team ownership via namespaces
 - **Versioned operations** — version-prefixed names (`v1:orders.getItem`), additive-first evolution rules, and a deprecation lifecycle with contractual sunset dates

@@ -24,8 +24,8 @@ type operationInstance struct {
 	Result       interface{}
 	Error        map[string]interface{}
 	RetryAfterMs int
-	CreatedAt    string
-	ExpiresAt    string
+	CreatedAt    int64
+	ExpiresAt    int64
 	Chunks       []chunk
 }
 
@@ -40,11 +40,9 @@ func createInstance(requestID string, op string) *operationInstance {
 		Op:           op,
 		State:        "accepted",
 		RetryAfterMs: 100,
-		CreatedAt:    time.Now().UTC().Format(time.RFC3339Nano),
-		ExpiresAt:    time.Now().Add(3600 * time.Second).UTC().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt:    time.Now().Unix(),
+		ExpiresAt:    time.Now().Add(3600 * time.Second).Unix(),
 	}
-	// Normalize to Z suffix
-	instance.CreatedAt = normalizeISOTime(instance.CreatedAt)
 
 	instancesMu.Lock()
 	instances[requestID] = instance
@@ -139,14 +137,6 @@ func buildChunks(data string, chunkSize int) []chunk {
 	}
 
 	return chunks
-}
-
-func normalizeISOTime(t string) string {
-	parsed, err := time.Parse(time.RFC3339Nano, t)
-	if err != nil {
-		return t
-	}
-	return parsed.UTC().Format("2006-01-02T15:04:05.000Z")
 }
 
 func nowISO() string {

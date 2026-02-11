@@ -7,9 +7,9 @@ export interface CallResponse {
   result?: unknown
   error?: { code: string; message: string; cause?: Record<string, unknown> }
   location?: { uri: string; method?: string; headers?: Record<string, string> }
-  stream?: { transport: string; location: string; sessionId: string; encoding?: string; expiresAt?: string }
+  stream?: { transport: string; location: string; sessionId: string; encoding?: string; expiresAt?: number }
   retryAfterMs?: number
-  expiresAt?: string
+  expiresAt?: number
 }
 
 export async function call(op: string, args: Record<string, unknown> = {}, ctx: Record<string, unknown> = {}): Promise<{ status: number; body: CallResponse }> {

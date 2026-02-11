@@ -22,11 +22,11 @@ describe("Streaming (REQ-STREAM)", () => {
     expect(body.stream!.transport).toBe("wss");
   });
 
-  test("streaming response includes stream.expiresAt as ISO 8601 timestamp", async () => {
+  test("streaming response includes stream.expiresAt as Unix epoch seconds", async () => {
     const { body } = await call("v1:todos.watch", {});
     expect(body.stream).toBeDefined();
-    expect(body.stream!.expiresAt).toBeTruthy();
-    expect(body.stream!.expiresAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(typeof body.stream!.expiresAt).toBe("number");
+    expect(body.stream!.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 
   test("stream.encoding is json", async () => {

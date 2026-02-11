@@ -182,11 +182,11 @@ All protocol-level responses SHOULD return this canonical envelope whenever a pa
     "schema": "string",
     "location": "string (URI)",
     "sessionId": "uuid",
-    "expiresAt": "ISO 8601 timestamp (optional)",
+    "expiresAt": "integer (Unix epoch seconds, optional)",
     "auth": {
       "tokenType": "bearer | apiKey | otk",
       "token": "string",
-      "expiresAt": "ISO 8601 timestamp (optional)"
+      "expiresAt": "integer (Unix epoch seconds, optional)"
     }
   },
   "location": {
@@ -194,10 +194,10 @@ All protocol-level responses SHOULD return this canonical envelope whenever a pa
     "auth": {
       "tokenType": "bearer | apiKey | otk",
       "token": "string",
-      "expiresAt": "ISO 8601 timestamp (optional)"
+      "expiresAt": "integer (Unix epoch seconds, optional)"
     }
   },
-  "expiresAt": "ISO 8601 timestamp (optional)",
+  "expiresAt": "integer (Unix epoch seconds, optional)",
   "retryAfterMs": 500
 }
 ```
@@ -227,11 +227,11 @@ All protocol-level responses SHOULD return this canonical envelope whenever a pa
   - `stream.schema` — Fully-qualified schema name for each frame, so the consumer knows how to deserialize.
   - `stream.location` — URI of the stream endpoint to connect to.
   - `stream.sessionId` — Stream session identifier.
-  - `stream.expiresAt` — Optional. ISO 8601 timestamp indicating when the server may close the stream. The caller SHOULD re-subscribe before this time.
+  - `stream.expiresAt` — Optional. Integer (Unix epoch seconds) indicating when the server may close the stream. The caller SHOULD re-subscribe before this time.
   - `stream.auth` — Optional. Short-lived credentials for authenticating to the stream endpoint. Present when `stream.location` requires authentication beyond what the transport provides natively.
   - `stream.auth.tokenType` — Credential type: `bearer` (Authorization header), `apiKey` (query parameter or header), `otk` (one-time key consumed on first use).
   - `stream.auth.token` — The credential value.
-  - `stream.auth.expiresAt` — Optional. ISO 8601 expiry timestamp. The caller MUST re-subscribe before this time to obtain fresh credentials. Omitted for one-time keys that have no time-based expiry.
+  - `stream.auth.expiresAt` — Optional. Integer (Unix epoch seconds) indicating when the credentials expire. The caller MUST re-subscribe before this time to obtain fresh credentials. Omitted for one-time keys that have no time-based expiry.
 
 - `result`, `error`, and `stream` are mutually exclusive — exactly one is present depending on `state`.
 
@@ -241,13 +241,13 @@ All protocol-level responses SHOULD return this canonical envelope whenever a pa
   - `location.auth` — Optional. Short-lived credentials for the target. Omitted when the URI is pre-signed or publicly accessible.
   - `location.auth.tokenType` — Credential type: `bearer`, `apiKey`, or `otk`.
   - `location.auth.token` — The credential value.
-  - `location.auth.expiresAt` — Optional. ISO 8601 expiry timestamp.
+  - `location.auth.expiresAt` — Optional. Integer (Unix epoch seconds) indicating when the credentials expire.
 
 - `retryAfterMs`
   Optional hint for polling cadence.
 
 - `expiresAt`
-  Optional. ISO 8601 timestamp indicating when the operation instance and its results (including chunks) will expire. After this time, `GET /ops/{requestId}` and chunk endpoints return `404`. Present on `state=accepted`, `state=pending`, and `state=complete` responses. Allows clients and agents to know how long they have to poll or retrieve results.
+  Optional. Integer (Unix epoch seconds) indicating when the operation instance and its results (including chunks) will expire. After this time, `GET /ops/{requestId}` and chunk endpoints return `404`. Present on `state=accepted`, `state=pending`, and `state=complete` responses. Allows clients and agents to know how long they have to poll or retrieve results.
 
 ---
 
@@ -857,9 +857,9 @@ When an operation is deprecated, the registry entry includes `deprecated`, `suns
 - `frameSchema` — Schema describing each frame in a stream. Present only when `executionModel=stream`. Enables agents to understand frame structure before subscribing.
 - `supportedTransports` — Which transports a streaming operation can deliver over. The caller can express preference in `args`; the server picks the best match.
 - `supportedEncodings` — Which encodings are available for stream frames. Same negotiation as transports.
-- `ttlSeconds` — Default stream lifetime for this operation. The server uses this to compute `stream.expiresAt` in the response envelope.
+- `ttlSeconds` — Default stream lifetime for this operation. The server adds this to the current time to compute `stream.expiresAt` (Unix epoch seconds) in the response envelope.
 - `frameIntegrity` — Whether stream frames include integrity headers (sequence number and checksum). Defaults to `false`. Recommended for safety-critical applications.
-- `resultTtlSeconds` — Optional. Default retention time for operation instances and their results. The server uses this to compute `expiresAt` in responses. Omitted when retention is unlimited or managed externally.
+- `resultTtlSeconds` — Optional. Default retention time for operation instances and their results. The server adds this to the current time to compute `expiresAt` (Unix epoch seconds) in responses. Omitted when retention is unlimited or managed externally.
 
 ---
 

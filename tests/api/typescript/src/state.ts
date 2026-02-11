@@ -14,8 +14,8 @@ export interface OperationInstance {
   result?: unknown;
   error?: { code: string; message: string };
   retryAfterMs: number;
-  createdAt: string;
-  expiresAt: string;
+  createdAt: number;
+  expiresAt: number;
   chunks?: Chunk[];
 }
 
@@ -27,8 +27,8 @@ export function createInstance(requestId: string, op: string): OperationInstance
     op,
     state: "accepted",
     retryAfterMs: 100,
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+    createdAt: Math.floor(Date.now() / 1000),
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
   };
   operationInstances.set(requestId, instance);
   return instance;

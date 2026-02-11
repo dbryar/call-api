@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import base64
-from datetime import datetime, timedelta, timezone
+import time
 from typing import Optional, Any
 
 
@@ -53,8 +53,8 @@ class OperationInstance:
         self.result: Any = None
         self.error: Optional[dict] = None
         self.retry_after_ms = 100
-        self.created_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        self.expires_at = (datetime.now(timezone.utc) + timedelta(seconds=3600)).isoformat().replace("+00:00", "Z")
+        self.created_at = int(time.time())
+        self.expires_at = int(time.time()) + 3600
         self.chunks: Optional[list[Chunk]] = None
 
 

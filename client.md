@@ -53,18 +53,18 @@ type CallResponse = {
   state: "complete" | "accepted" | "pending" | "streaming" | "error"
   result?: unknown
   error?: { code: string; message: string; cause?: unknown }
-  location?: { uri: string; auth?: { tokenType: string; token: string; expiresAt?: string } }
+  location?: { uri: string; auth?: { tokenType: string; token: string; expiresAt?: number } }
   stream?: {
     transport: string
     encoding: string
     schema: string
     location: string
     sessionId: string
-    expiresAt?: string
-    auth?: { tokenType: string; token: string; expiresAt?: string }
+    expiresAt?: number
+    auth?: { tokenType: string; token: string; expiresAt?: number }
   }
   retryAfterMs?: number
-  expiresAt?: string
+  expiresAt?: number
 }
 
 async function call(
@@ -330,7 +330,7 @@ The client's job is to wait and re-check. The `state` field tells it when to sto
     "schema": "device.PositionFrame",
     "location": "wss://streams.example.com/s/ggg-hhh-iii",
     "sessionId": "mission-001",
-    "expiresAt": "2026-02-11T15:00:00Z"
+    "expiresAt": 1739282400
   }
 }
 ```
@@ -543,7 +543,7 @@ await fetch("https://api.example.com/call", {
 
 ```typescript
 const sub = await call("v1:device.subscribePosition", { deviceId: "arm-1" })
-// sub.stream.auth = { tokenType: "bearer", token: "short-lived-xyz", expiresAt: "..." }
+// sub.stream.auth = { tokenType: "bearer", token: "short-lived-xyz", expiresAt: 1739282400 }
 
 const ws = new WebSocket(sub.stream!.location, {
   headers: { Authorization: `Bearer ${sub.stream!.auth!.token}` },

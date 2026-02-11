@@ -81,9 +81,9 @@ describe("Async Execution (REQ-ASYNC)", () => {
     expect(body.state).toBe("error");
   });
 
-  test("202 response includes expiresAt timestamp", async () => {
+  test("202 response includes expiresAt as Unix epoch seconds", async () => {
     const { body } = await call("v1:todos.export", { format: "csv" });
-    expect(body.expiresAt).toBeTruthy();
-    expect(body.expiresAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(typeof body.expiresAt).toBe("number");
+    expect(body.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 });
