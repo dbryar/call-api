@@ -89,23 +89,23 @@ API_URL=http://localhost:3000 bun test
 
 ## Test Coverage
 
-112 tests across 13 files covering the full OpenCALL specification:
+115 tests across 13 files covering the full OpenCALL specification:
 
 | File | Tests | Area |
 |------|-------|------|
 | `self-description.test.ts` | 13 | Registry endpoint, caching, metadata |
 | `envelope.test.ts` | 6 | Response envelope format |
-| `crud.test.ts` | 15+ | Create, read, list, update, delete, complete |
-| `errors.test.ts` | 7 | Protocol and domain error handling |
+| `crud.test.ts` | 18 | Create, read, list, update, delete, complete |
+| `errors.test.ts` | 8 | Protocol and domain error handling |
 | `idempotency.test.ts` | 4 | Idempotency key deduplication |
 | `auth.test.ts` | 10 | Auth 401/403, scopes |
-| `async.test.ts` | 10 | HTTP 202, polling, state transitions |
+| `async.test.ts` | 11 | HTTP 202, polling, state transitions |
 | `deprecated.test.ts` | 7 | HTTP 410, sunset dates, replacements |
 | `status-codes.test.ts` | 7 | HTTP 500/502/503/404 |
 | `evolution.test.ts` | 5 | Schema robustness principle |
 | `chunked.test.ts` | 8 | Chunked retrieval with SHA-256 |
 | `media.test.ts` | 9 | Multipart upload, 303 redirect |
-| `streaming.test.ts` | 8 | WebSocket streaming |
+| `streaming.test.ts` | 9 | WebSocket streaming |
 
 ## Operations
 
@@ -212,7 +212,7 @@ tests/
    - `WebSocket /streams/{sessionId}` — streaming
    - `POST /_internal/tokens` — register auth tokens (test helper)
 3. Start the server and run: `API_URL=http://localhost:<port> bun test` (setup auto-registers auth tokens)
-4. All 112 tests should pass — the same contract applies to every implementation
+4. All 115 tests should pass — the same contract applies to every implementation
 
 ## Environment Variables
 
