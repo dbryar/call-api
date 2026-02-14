@@ -1251,10 +1251,11 @@ async function initAccount() {
 
   showLoading(content, 'Loading account data...');
 
-  // Fetch patron data and history in parallel
-  const [patronResult, historyResult] = await Promise.all([
+  // Fetch patron data, history, and reservations in parallel
+  const [patronResult, historyResult, reservationsResult] = await Promise.all([
     callApi('v1:patron.get'),
     callApi('v1:patron.history', { limit: 20, offset: 0 }),
+    callApi('v1:patron.reservations', { limit: 20, offset: 0 }),
   ]);
 
   if (patronResult.data?.state === 'error') {
@@ -1264,6 +1265,7 @@ async function initAccount() {
 
   const patron = patronResult.data?.result || patronResult.data;
   const history = historyResult.data?.result || historyResult.data;
+  const reservations = reservationsResult.data?.result || reservationsResult.data;
 
   let html = '';
 
@@ -1305,8 +1307,57 @@ async function initAccount() {
     html += '</div>';
   }
 
+  // Reservations section
+  html += '<h3 class="mb-2">Reservations</h3>';
+
+  if (reservations?.reservations && reservations.reservations.length > 0) {
+    html += '<div style="overflow-x:auto">' +
+      '<table class="history-table">' +
+      '<thead><tr>' +
+        '<th>Title</th>' +
+        '<th>Creator</th>' +
+        '<th>Reserved</th>' +
+        '<th>Status</th>' +
+      '</tr></thead><tbody>';
+
+    reservations.reservations.forEach(function(res) {
+      var statusBadge = '';
+      switch (res.status) {
+        case 'pending':
+          statusBadge = '<span class="badge badge-pending">Pending</span>';
+          break;
+        case 'ready':
+          statusBadge = '<span class="badge badge-accepted">Ready for Pickup</span>';
+          break;
+        case 'collected':
+          statusBadge = '<span class="badge badge-complete">Collected</span>';
+          break;
+        case 'cancelled':
+          statusBadge = '<span class="badge badge-error">Cancelled</span>';
+          break;
+        default:
+          statusBadge = '<span class="badge">' + escapeHtml(res.status) + '</span>';
+      }
+
+      html += '<tr>' +
+        '<td><a href="/catalog/' + escapeHtml(res.itemId) + '">' + escapeHtml(res.title || '') + '</a></td>' +
+        '<td>' + escapeHtml(res.creator || '') + '</td>' +
+        '<td>' + formatDate(res.reservedAt) + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+      '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+  } else {
+    html += '<div class="empty-state">' +
+      '<div class="empty-icon">&#128278;</div>' +
+      '<div class="empty-title">No reservations</div>' +
+      '<div class="empty-text">Reserve items from the <a href="/catalog">catalog</a> to see them here.</div>' +
+    '</div>';
+  }
+
   // Lending history section
-  html += '<h3 class="mb-2">Lending History</h3>';
+  html += '<h3 class="mb-2" style="margin-top:1.5rem">Lending History</h3>';
 
   if (history?.records && history.records.length > 0) {
     html += '<div style="overflow-x:auto">' +
