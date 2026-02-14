@@ -887,10 +887,27 @@ async function initDashboard() {
 
   html += '</div>';
 
-  // Agent instructions callout
+  // Agent instructions callout — fetch a random book for the suggestion
+  var agentCardNumber = patron.cardNumber || '';
+  var appOrigin = window.location.origin;
+  var suggestion = 'ask your favourite AI agent to reserve a book for you';
+
+  var randomResult = await callApi('v1:catalog.list', { type: 'book', limit: 20 });
+  var catalogItems = randomResult.data?.result?.items || randomResult.data?.items || [];
+  if (catalogItems.length > 0) {
+    var pick = catalogItems[Math.floor(Math.random() * catalogItems.length)];
+    suggestion = 'ask your favourite AI agent to reserve <strong>' +
+      escapeHtml(pick.title) + '</strong> by ' + escapeHtml(pick.creator) +
+      ' for you';
+  }
+
   html += '<div class="card mt-4">' +
     '<h3>AI Agent Integration</h3>' +
-    '<p class="card-meta mt-1">This API supports AI agent discovery. Agents can authenticate using a library card number and interact with all available operations.</p>' +
+    '<p class="card-meta mt-1">This library supports AI agents. Why not ' +
+    suggestion + ' from your local community library at <code>' +
+    escapeHtml(appOrigin) + '</code>?</p>' +
+    '<p class="card-meta mt-1">Your library card number is <strong>' +
+    escapeHtml(agentCardNumber) + '</strong> — give it to the agent so it can sign in on your behalf.</p>' +
     '<div class="mt-2">' +
       '<a href="' + (document.body.dataset.agentsUrl || '/') + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline">View Agent Instructions</a>' +
     '</div>' +
