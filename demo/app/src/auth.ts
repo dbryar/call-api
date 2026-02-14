@@ -1,7 +1,7 @@
 import { createSession, getSession, deleteSession, type Session } from "./session.ts";
 import { proxyAuth } from "./proxy.ts";
 
-const AGENTS_URL = process.env.AGENTS_URL || "http://localhost:3003";
+const AGENTS_URL = process.env.AGENTS_URL || "http://localhost:8888";
 
 /**
  * Parse cookies from a Cookie header string into a key-value map.

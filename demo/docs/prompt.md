@@ -50,9 +50,9 @@ All four services run on `localhost` with different ports:
 | Service | Local URL               | Port |
 | ------- | ----------------------- | ---- |
 | API     | `http://localhost:3000` | 3000 |
-| App     | `http://localhost:3001` | 3001 |
-| WWW     | `http://localhost:3002` | 3002 |
-| Agents  | `http://localhost:3003` | 3003 |
+| App     | `http://localhost:8000` | 8000 |
+| WWW     | `http://localhost:8080` | 8080 |
+| Agents  | `http://localhost:8888` | 8888 |
 
 Start locally with `bun run dev` in each service directory (or a root-level script that starts all four).
 
@@ -72,9 +72,9 @@ Every service that references another service uses environment variables to reso
 | Variable     | Used by     | Local default           | Remote value                      |
 | ------------ | ----------- | ----------------------- | --------------------------------- |
 | `API_URL`    | App, Agents | `http://localhost:3000` | `https://api.opencall-api.com`    |
-| `APP_URL`    | WWW, API    | `http://localhost:3001` | `https://app.opencall-api.com`    |
-| `WWW_URL`    | App         | `http://localhost:3002` | `https://www.opencall-api.com`    |
-| `AGENTS_URL` | App         | `http://localhost:3003` | `https://agents.opencall-api.com` |
+| `APP_URL`    | WWW, API    | `http://localhost:8000` | `https://app.opencall-api.com`    |
+| `WWW_URL`    | App         | `http://localhost:8080` | `https://www.opencall-api.com`    |
+| `AGENTS_URL` | App         | `http://localhost:8888` | `https://agents.opencall-api.com` |
 
 These variables are used everywhere a cross-service URL appears:
 
@@ -1791,7 +1791,7 @@ Cross-service URL variables (`API_URL`, `APP_URL`, `WWW_URL`, `AGENTS_URL`) are 
 | `API_URL`         | API service URL (passed to browser for direct calls)    |
 | `AGENTS_URL`      | Agents service URL (for discovery headers/meta tags)    |
 | `WWW_URL`         | WWW service URL (for nav links)                         |
-| `PORT`            | Server port (default 3001, Cloud Run sets 8080)         |
+| `PORT`            | Server port (default 8000, Cloud Run sets 8080)         |
 | `SESSION_DB_PATH` | SQLite file path for sessions (default `./sessions.db`) |
 | `COOKIE_SECRET`   | Secret for signing `sid` cookies                        |
 
@@ -1800,14 +1800,14 @@ Cross-service URL variables (`API_URL`, `APP_URL`, `WWW_URL`, `AGENTS_URL`) are 
 | Var       | Description                              |
 | --------- | ---------------------------------------- |
 | `APP_URL` | App service URL (for "Try the Demo" CTA) |
-| `PORT`    | Server port (default 3002)               |
+| `PORT`    | Server port (default 8080)               |
 
 **Agents:**
 
 | Var       | Description                                         |
 | --------- | --------------------------------------------------- |
 | `API_URL` | API service URL (templated into agent instructions) |
-| `PORT`    | Server port (default 3003)                          |
+| `PORT`    | Server port (default 8888)                          |
 
 ---
 

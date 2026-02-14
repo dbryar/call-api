@@ -76,4 +76,69 @@ describe("Async operations — polling", () => {
     expect(res.body.error).toBeDefined();
     expect(res.body.error.code).toBe("OPERATION_NOT_FOUND");
   });
+
+  test(
+    "polling twice within 1 second returns 429 RATE_LIMITED",
+    async () => {
+      const res = await call("v1:report.generate", {}, undefined, token);
+      if (res.status === 400) return;
+
+      const requestId = res.body.requestId;
+
+      // First poll — should succeed
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const first = await poll(requestId);
+      expect([200, 202]).toContain(first.status);
+
+      // Immediate second poll — should be rate limited
+      const second = await poll(requestId);
+      expect(second.status).toBe(429);
+      expect(second.body.state).toBe("error");
+      expect(second.body.error.code).toBe("RATE_LIMITED");
+      expect(second.body.retryAfterMs).toBeDefined();
+      expect(second.body.retryAfterMs).toBeGreaterThan(0);
+      expect(second.body.retryAfterMs).toBeLessThanOrEqual(1000);
+    },
+    { timeout: 15000 }
+  );
+
+  test(
+    "polling with 1+ second gap both succeed (no 429)",
+    async () => {
+      const res = await call("v1:report.generate", {}, undefined, token);
+      if (res.status === 400) return;
+
+      const requestId = res.body.requestId;
+
+      // First poll after enough delay
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const first = await poll(requestId);
+      expect([200, 202]).toContain(first.status);
+
+      // Wait >1 second then poll again
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const second = await poll(requestId);
+      expect([200, 202]).toContain(second.status);
+    },
+    { timeout: 15000 }
+  );
+
+  test(
+    "different requestIds can be polled simultaneously without 429",
+    async () => {
+      const res1 = await call("v1:report.generate", {}, undefined, token);
+      const res2 = await call("v1:report.generate", {}, undefined, token);
+      if (res1.status === 400 || res2.status === 400) return;
+
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
+      // Poll both — neither should be rate limited
+      const poll1 = await poll(res1.body.requestId);
+      const poll2 = await poll(res2.body.requestId);
+
+      expect([200, 202]).toContain(poll1.status);
+      expect([200, 202]).toContain(poll2.status);
+    },
+    { timeout: 15000 }
+  );
 });

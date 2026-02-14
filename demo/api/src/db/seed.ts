@@ -163,14 +163,20 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-const CARD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-function generateCardNumber(): string {
-  let card = "";
-  for (let i = 0; i < 10; i++) {
-    card += CARD_CHARS[Math.floor(Math.random() * CARD_CHARS.length)];
+/**
+ * Generate a library card number in XXXX-XXXX-YY format:
+ * 8 random digits followed by 2 letters derived from the username initials.
+ */
+function generateCardNumber(username: string): string {
+  let digits = "";
+  for (let i = 0; i < 8; i++) {
+    digits += Math.floor(Math.random() * 10).toString();
   }
-  return `${card.slice(0, 4)}-${card.slice(4, 8)}-${card.slice(8, 10)}`;
+  const parts = username.split("-");
+  const initials = (
+    (parts[0]?.[0] || "X") + (parts[1]?.[0] || "X")
+  ).toUpperCase();
+  return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${initials}`;
 }
 
 function generateISBN(): string {
@@ -368,13 +374,13 @@ function seed() {
   const usedUsernames = new Set<string>();
 
   // Add fixed test user for integration tests and agent demos
-  // Card number: TEST-DEMO-00 (deterministic for testing)
+  // Card number: 0000-0000-TP (deterministic for testing)
   const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
   patrons.push({
     id: TEST_USER_ID,
     username: "test-patron",
     name: "Test Patron",
-    cardNumber: "TEST-DEMO-00",
+    cardNumber: "0000-0000-TP",
   });
   usedUsernames.add("test-patron");
 
@@ -387,7 +393,7 @@ function seed() {
     usedUsernames.add(username);
 
     const name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
-    const cardNumber = generateCardNumber();
+    const cardNumber = generateCardNumber(username);
 
     patrons.push({
       id: crypto.randomUUID(),

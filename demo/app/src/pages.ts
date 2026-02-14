@@ -1,7 +1,7 @@
 import type { Session } from "./session.ts";
 
-const AGENTS_URL = process.env.AGENTS_URL || "http://localhost:3003";
-const WWW_URL = process.env.WWW_URL || "http://localhost:3002";
+const AGENTS_URL = process.env.AGENTS_URL || "http://localhost:8888";
+const WWW_URL = process.env.WWW_URL || "http://localhost:8080";
 
 /**
  * Escape HTML special characters to prevent XSS.

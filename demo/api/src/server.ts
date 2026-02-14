@@ -8,7 +8,7 @@ import { incrementApiCalls, incrementPageViews } from "./services/analytics.ts";
 
 // CORS configuration
 const ALLOWED_ORIGINS = [
-  process.env.APP_URL || "http://localhost:3000",
+  process.env.APP_URL || "http://localhost:8000",
 ];
 
 /**

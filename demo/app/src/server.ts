@@ -5,8 +5,8 @@ import { renderDashboard, renderCatalog, renderItem, renderAccount, renderReport
 import { join, dirname } from "node:path";
 import type { Session } from "./session.ts";
 
-const AGENTS_URL = process.env.AGENTS_URL || "http://localhost:3003";
-const WWW_URL = process.env.WWW_URL || "http://localhost:3002";
+const AGENTS_URL = process.env.AGENTS_URL || "http://localhost:8888";
+const WWW_URL = process.env.WWW_URL || "http://localhost:8080";
 const PUBLIC_DIR = join(dirname(new URL(import.meta.url).pathname), "..", "public");
 const API_URL = process.env.API_URL || "http://localhost:3000";
 
@@ -84,7 +84,7 @@ export function startServer() {
   // Initialize the session database on startup
   getDb();
 
-  const port = parseInt(process.env.APP_PORT || "3000", 10);
+  const port = parseInt(process.env.APP_PORT || "8000", 10);
 
   const server = Bun.serve({
     port,

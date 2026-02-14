@@ -37,7 +37,7 @@ describe("GET /auth", () => {
   test("contains X-AI-Instructions header", async () => {
     const res = await fetch(`${APP_BASE}/auth`);
     expect(res.headers.get("X-AI-Instructions")).toBe(
-      process.env.AGENTS_URL || "http://localhost:3003"
+      process.env.AGENTS_URL || "http://localhost:8888"
     );
   });
 
@@ -45,7 +45,7 @@ describe("GET /auth", () => {
     const res = await fetch(`${APP_BASE}/auth`);
     const html = await res.text();
     expect(html).toContain('meta name="ai-instructions"');
-    expect(html).toContain(process.env.AGENTS_URL || "http://localhost:3003");
+    expect(html).toContain(process.env.AGENTS_URL || "http://localhost:8888");
   });
 
   test("shows reset banner when ?reset=1", async () => {
@@ -292,7 +292,7 @@ describe("Static and special routes", () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("User-agent: *");
-    expect(text).toContain(process.env.AGENTS_URL || "http://localhost:3003");
+    expect(text).toContain(process.env.AGENTS_URL || "http://localhost:8888");
   });
 
   test("GET /.well-known/ai-instructions redirects to agent instructions", async () => {
@@ -301,7 +301,7 @@ describe("Static and special routes", () => {
     });
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe(
-      process.env.AGENTS_URL || "http://localhost:3003"
+      process.env.AGENTS_URL || "http://localhost:8888"
     );
   });
 

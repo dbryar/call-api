@@ -27,15 +27,21 @@ function generateUsername(): string {
 
 // ── Card number generator ───────────────────────────────────────────────
 
-const CARD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-function generateCardNumber(): string {
-  let card = "";
-  for (let i = 0; i < 10; i++) {
-    card += CARD_CHARS[Math.floor(Math.random() * CARD_CHARS.length)];
+/**
+ * Generate a library card number in XXXX-XXXX-YY format:
+ * 8 random digits followed by 2 letters derived from the username initials.
+ * Username is expected in "adjective-animal" format; initials are uppercased.
+ */
+function generateCardNumber(username: string): string {
+  let digits = "";
+  for (let i = 0; i < 8; i++) {
+    digits += Math.floor(Math.random() * 10).toString();
   }
-  // Format: XXXX-XXXX-XX
-  return `${card.slice(0, 4)}-${card.slice(4, 8)}-${card.slice(8, 10)}`;
+  const parts = username.split("-");
+  const initials = (
+    (parts[0]?.[0] || "X") + (parts[1]?.[0] || "X")
+  ).toUpperCase();
+  return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${initials}`;
 }
 
 // ── Seed overdue items for a new patron ─────────────────────────────────
@@ -104,7 +110,7 @@ export async function handleHumanAuth(request: Request, db: Database): Promise<R
   } else {
     // Create new patron
     patronId = crypto.randomUUID();
-    cardNumber = generateCardNumber();
+    cardNumber = generateCardNumber(username);
     const patronName = username
       .split("-")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -158,7 +164,7 @@ export async function handleHumanAuth(request: Request, db: Database): Promise<R
 
 // ── POST /auth/agent — Agent auth ───────────────────────────────────────
 
-const CARD_PATTERN = /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{2}$/;
+const CARD_PATTERN = /^\d{4}-\d{4}-[A-Za-z]{2}$/;
 
 export async function handleAgentAuth(request: Request, db: Database): Promise<Response> {
   let body: { cardNumber?: string };

@@ -2,7 +2,7 @@ import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { startServer, stopServer } from "./helpers/server.ts";
 
 const BASE_URL = `http://localhost:${process.env.TEST_PORT || 9876}`;
-const APP_ORIGIN = "http://localhost:3000";
+const APP_ORIGIN = "http://localhost:8000";
 
 beforeAll(async () => {
   await startServer();

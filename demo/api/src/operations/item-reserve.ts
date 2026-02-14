@@ -9,7 +9,7 @@ import { hasOverdueItems } from "../services/lending.ts";
  *
  * @op v1:item.reserve
  * @execution sync
- * @timeout 5000
+ * @timeout 5s
  * @ttl 0s
  * @cache none
  * @security items:write

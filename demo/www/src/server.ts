@@ -3,8 +3,8 @@
  * Serves the static brochure site with templated URLs
  */
 
-const PORT = parseInt(process.env.WWW_PORT || process.env.PORT || "3002", 10);
-const APP_URL = process.env.APP_URL || "http://localhost:3001";
+const PORT = parseInt(process.env.WWW_PORT || process.env.PORT || "8080", 10);
+const APP_URL = process.env.APP_URL || "http://localhost:8000";
 const API_URL = process.env.API_URL || "http://localhost:3000";
 
 // Read and template the HTML file

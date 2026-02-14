@@ -11,6 +11,7 @@
     "reset": "bun run src/db/reset.ts"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.15.0",
     "zod": "^3.25.0",
     "xstate": "^5.19.0"
   },

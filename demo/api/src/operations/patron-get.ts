@@ -9,10 +9,10 @@ import { getOverdueItems } from "../services/lending.ts";
  *
  * @op v1:patron.get
  * @execution sync
- * @timeout 5000
- * @ttl 300
+ * @timeout 5s
+ * @ttl 0s
  * @security patron:read
- * @cache server
+ * @cache none
  */
 
 export const args = z.object({});

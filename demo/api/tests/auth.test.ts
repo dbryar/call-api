@@ -98,7 +98,7 @@ describe("POST /auth/agent", () => {
   });
 
   test("with unknown card returns 404 PATRON_NOT_FOUND", async () => {
-    const res = await authenticateAgent("AbCd-EfGh-Ij");
+    const res = await authenticateAgent("9999-9999-ZZ");
     expect(res.status).toBe(404);
     expect(res.body.error).toBeDefined();
     expect(res.body.error.code).toBe("PATRON_NOT_FOUND");

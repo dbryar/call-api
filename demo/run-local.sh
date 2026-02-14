@@ -15,9 +15,9 @@ NC='\033[0m'
 
 # Local ports per design spec
 API_PORT=3000
-APP_PORT=3001
-WWW_PORT=3002
-AGENTS_PORT=3003
+APP_PORT=8000
+WWW_PORT=8080
+AGENTS_PORT=8888
 
 # URLs for cross-service communication
 API_URL="http://localhost:$API_PORT"

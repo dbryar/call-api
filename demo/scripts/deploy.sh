@@ -48,7 +48,7 @@ gcloud run deploy opencall-demo-api \
   --cpu 1 \
   --min-instances 0 \
   --max-instances 3 \
-  --set-env-vars "GCS_BUCKET=${GCS_BUCKET},GCS_PROJECT_ID=${PROJECT_ID},ADMIN_SECRET=${ADMIN_SECRET},PORT=8080" \
+  --set-env-vars "GCS_BUCKET=${GCS_BUCKET},GCS_PROJECT_ID=${PROJECT_ID},ADMIN_SECRET=${ADMIN_SECRET},APP_URL=${APP_URL:-https://app.opencall-api.com},PORT=8080" \
   --quiet
 
 API_URL="$(gcloud run services describe opencall-demo-api \
@@ -80,7 +80,7 @@ gcloud run deploy opencall-demo-app \
   --cpu 1 \
   --min-instances 0 \
   --max-instances 3 \
-  --set-env-vars "API_URL=${API_URL},COOKIE_SECRET=${COOKIE_SECRET},PORT=8080,AGENTS_URL=https://agents.opencall-api.com" \
+  --set-env-vars "API_URL=${API_URL},COOKIE_SECRET=${COOKIE_SECRET},PORT=8080,AGENTS_URL=https://agents.opencall-api.com,WWW_URL=https://www.opencall-api.com" \
   --quiet
 
 APP_URL="$(gcloud run services describe opencall-demo-app \

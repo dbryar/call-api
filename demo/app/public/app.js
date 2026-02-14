@@ -448,12 +448,21 @@ let responses = new Map();
 // Currently selected request timestamp
 let selectedRequestTimestamp = null;
 
+// Monotonic counter to avoid timestamp collisions when parallel calls resolve in the same ms
+let requestSeq = 0;
+
 /**
  * Add a request to the requests Map.
+ * Uses a monotonic key to prevent collisions from parallel calls.
  */
 function addRequest(entry) {
-  requests.set(entry.timestamp, entry);
-  selectedRequestTimestamp = entry.timestamp;
+  let key = entry.timestamp;
+  while (requests.has(key)) {
+    key = entry.timestamp + (++requestSeq) * 0.001;
+  }
+  entry.timestamp = key;
+  requests.set(key, entry);
+  selectedRequestTimestamp = key;
 }
 
 /**
@@ -483,28 +492,82 @@ function getSortedRequestTimestamps() {
   return Array.from(requests.keys()).sort((a, b) => b - a);
 }
 
+// Viewer collapsed state
+let viewerCollapsed = false;
+
 /**
- * Navigate to the previous request (older).
+ * Select a request by timestamp and re-render.
+ */
+function selectRequest(timestamp) {
+  selectedRequestTimestamp = timestamp;
+  renderEnvelopeViewer();
+}
+
+/**
+ * Navigate to the previous (older) request.
  */
 function envelopePrev() {
   const timestamps = getSortedRequestTimestamps();
-  const currentIdx = timestamps.indexOf(selectedRequestTimestamp);
-  if (currentIdx < timestamps.length - 1) {
-    selectedRequestTimestamp = timestamps[currentIdx + 1];
+  const idx = timestamps.indexOf(selectedRequestTimestamp);
+  if (idx < timestamps.length - 1) {
+    selectedRequestTimestamp = timestamps[idx + 1];
     renderEnvelopeViewer();
   }
 }
 
 /**
- * Navigate to the next request (newer).
+ * Navigate to the next (newer) request.
  */
 function envelopeNext() {
   const timestamps = getSortedRequestTimestamps();
-  const currentIdx = timestamps.indexOf(selectedRequestTimestamp);
-  if (currentIdx > 0) {
-    selectedRequestTimestamp = timestamps[currentIdx - 1];
+  const idx = timestamps.indexOf(selectedRequestTimestamp);
+  if (idx > 0) {
+    selectedRequestTimestamp = timestamps[idx - 1];
     renderEnvelopeViewer();
   }
+}
+
+/**
+ * Toggle viewer collapsed state.
+ */
+function toggleViewerCollapse() {
+  viewerCollapsed = !viewerCollapsed;
+  renderEnvelopeViewer();
+}
+
+/**
+ * Generate a status CSS class from an HTTP status code.
+ */
+function statusColorClass(status) {
+  if (status === 202) return 'status-accepted';
+  if (status === 303) return 'status-redirect';
+  if (status >= 200 && status < 300) return 'status-ok';
+  if (status >= 400 && status < 500) return 'status-error';
+  if (status >= 500) return 'status-server-error';
+  return '';
+}
+
+/**
+ * Copy a request as a curl command.
+ */
+function copyAsCurl(timestamp, btn) {
+  const req = requests.get(timestamp);
+  if (!req) return;
+
+  const method = req.method || 'POST';
+  const url = req.url || '/call';
+  let curl = 'curl -X ' + method + " '" + url + "'";
+
+  if (req.headers) {
+    Object.entries(req.headers).forEach(function(pair) {
+      curl += " \\\n  -H '" + pair[0] + ': ' + pair[1] + "'";
+    });
+  }
+  if (req.body) {
+    curl += " \\\n  -d '" + JSON.stringify(req.body) + "'";
+  }
+
+  copyToClipboard(curl, btn);
 }
 
 /**
@@ -526,57 +589,112 @@ function renderEnvelopeViewer() {
     return;
   }
 
+  const collapseIcon = viewerCollapsed ? '\u25b6' : '\u25bc';
   const timestamps = getSortedRequestTimestamps();
   const currentIdx = timestamps.indexOf(selectedRequestTimestamp);
   const total = timestamps.length;
+  const prevDisabled = currentIdx >= total - 1;
+  const nextDisabled = currentIdx <= 0;
 
-  // Get current request and its responses
-  const currentRequest = requests.get(selectedRequestTimestamp);
-  const requestId = currentRequest?.requestId;
-  const responseChain = requestId ? (responses.get(requestId) || []) : [];
-
-  const prevDisabled = currentIdx >= total - 1;  // Can't go to older
-  const nextDisabled = currentIdx <= 0;          // Can't go to newer
-
-  // Extract op name from request body for the label
-  const opName = currentRequest?.body?.op || currentRequest?.op || 'call';
-
-  // Build header with nav controls
+  // Header
   let html = '<div class="viewer-header">' +
-    '<span class="viewer-title">Envelope Viewer</span>' +
+    '<span class="viewer-title">' +
+      '<button class="btn-collapse" onclick="toggleViewerCollapse()">' + collapseIcon + '</button>' +
+      ' Envelope Viewer' +
+    '</span>' +
     '<div class="viewer-nav">' +
       '<button class="btn btn-sm btn-nav" onclick="envelopePrev()"' + (prevDisabled ? ' disabled' : '') + '>&lsaquo;</button>' +
-      '<span class="viewer-counter">' + (currentIdx + 1) + ' / ' + total + '</span>' +
+      '<span class="viewer-counter">' + (currentIdx + 1) + '/' + total + '</span>' +
       '<button class="btn btn-sm btn-nav" onclick="envelopeNext()"' + (nextDisabled ? ' disabled' : '') + '>&rsaquo;</button>' +
       '<button class="btn btn-sm btn-secondary" onclick="clearEnvelopeViewer()">Clear</button>' +
     '</div>' +
   '</div>';
 
-  // Op label bar
-  html += '<div class="viewer-op-label">' + escapeHtml(opName) + '</div>';
+  if (viewerCollapsed) {
+    viewer.innerHTML = html;
+    return;
+  }
 
-  // Build tabs - show response chain count if > 1
-  const responseLabel = responseChain.length > 1
-    ? 'Response (' + responseChain.length + ')'
-    : 'Response';
+  // Request list panel
+  html += '<div class="viewer-requests">';
+  timestamps.forEach(function(ts) {
+    const req = requests.get(ts);
+    const opName = req?.body?.op || req?.op || 'call';
+    const requestId = req?.requestId;
+    const chain = requestId ? (responses.get(requestId) || []) : [];
+    const lastResp = chain.length > 0 ? chain[chain.length - 1] : null;
+    const status = lastResp ? lastResp.status : '';
+    const elapsed = lastResp ? (lastResp.timeMs || 0) : '';
+    const colorClass = status ? statusColorClass(status) : '';
+    const selected = ts === selectedRequestTimestamp ? ' selected' : '';
+    const arrow = ts === selectedRequestTimestamp ? '\u25b9' : '\u25b8';
 
-  html += '<div class="tabs">';
-  html += '<button class="tab active" data-viewer-tab="request" onclick="switchViewerTab(\'request\')">Request</button>';
-  html += '<button class="tab" data-viewer-tab="response" onclick="switchViewerTab(\'response\')">' + responseLabel + '</button>';
+    html += '<div class="viewer-request-row' + selected + '" onclick="selectRequest(' + ts + ')">' +
+      '<span class="row-arrow">' + arrow + '</span>' +
+      '<span class="row-op">' + escapeHtml(opName) + '</span>' +
+      '<span class="row-status ' + colorClass + '">' + status + '</span>' +
+      '<span class="row-time">' + (elapsed ? elapsed + 'ms' : '') + '</span>' +
+    '</div>';
+  });
   html += '</div>';
 
-  // Content area
-  html += '<div class="content">';
+  // Detail panel — request then response(s) stacked
+  const currentRequest = requests.get(selectedRequestTimestamp);
+  const requestId = currentRequest?.requestId;
+  const responseChain = requestId ? (responses.get(requestId) || []) : [];
 
-  // Request tab content
-  html += '<div class="tab-content" data-viewer-content="request">';
-  html += renderRequestTab(currentRequest);
-  html += '</div>';
+  html += '<div class="viewer-detail">';
 
-  // Response tab content — shows full response chain
-  html += '<div class="tab-content" data-viewer-content="response" style="display:none">';
-  html += renderResponseChain(responseChain);
-  html += '</div>';
+  // REQUEST section
+  html += '<div class="viewer-section-label">' +
+    '<span>REQUEST</span>' +
+    '<button class="copy-btn" onclick="copyAsCurl(' + selectedRequestTimestamp + ', this)">Copy cURL</button>' +
+  '</div>';
+  html += renderRequestSection(currentRequest);
+
+  // RESPONSE section(s)
+  if (responseChain.length === 0) {
+    html += '<div class="viewer-section-label"><span>RESPONSE</span></div>';
+    html += '<div class="empty-viewer" style="height:auto;padding:1rem">Waiting for response\u2026</div>';
+  } else {
+    responseChain.forEach(function(resp, index) {
+      const total = responseChain.length;
+      const status = resp.status || 0;
+      const elapsed = resp.timeMs || resp.elapsed || 0;
+      const colorClass = statusColorClass(status);
+      const label = total > 1
+        ? 'RESPONSE ' + (index + 1) + '/' + total
+        : 'RESPONSE';
+      const textareaId = 'resp-raw-' + index;
+      const jsonStr = resp.body ? JSON.stringify(resp.body, null, 2) : '';
+
+      html += '<div class="viewer-section-label' + (index > 0 ? ' chain-divider' : '') + '">' +
+        '<span>' + label +
+          ' <span class="' + colorClass + '">' + status + '</span>' +
+          ' <span class="resp-time">' + elapsed + 'ms</span>' +
+        '</span>' +
+        '<button class="copy-btn" onclick="copyToClipboard(document.getElementById(\'' + textareaId + '\').value, this)">Copy</button>' +
+      '</div>';
+
+      if (resp.body?.state) {
+        html += '<div class="meta-row">' +
+          '<span class="meta-label">State</span>' +
+          '<span class="meta-value">' +
+            '<span class="status-indicator status-' + escapeHtml(resp.body.state) + '">' +
+              escapeHtml(resp.body.state) +
+            '</span>' +
+          '</span>' +
+        '</div>';
+      }
+
+      if (resp.body) {
+        html += '<div class="json-viewer">' +
+          '<pre class="code-block">' + syntaxHighlight(resp.body) + '</pre>' +
+          '<textarea class="sr-only" id="' + textareaId + '">' + escapeHtml(jsonStr) + '</textarea>' +
+        '</div>';
+      }
+    });
+  }
 
   html += '</div>';
 
@@ -584,14 +702,13 @@ function renderEnvelopeViewer() {
 }
 
 /**
- * Render the request tab content.
+ * Render the request detail section (method, URL, auth, body).
  */
-function renderRequestTab(req) {
-  if (!req) return '<div class="empty-viewer">No request data</div>';
+function renderRequestSection(req) {
+  if (!req) return '<div class="empty-viewer" style="height:auto;padding:1rem">No request data</div>';
 
   let html = '';
 
-  // Meta rows
   html += '<div class="meta-row">' +
     '<span class="meta-label">Method</span>' +
     '<span class="meta-value">' + escapeHtml(req.method || 'POST') + '</span>' +
@@ -609,12 +726,8 @@ function renderRequestTab(req) {
     '</div>';
   }
 
-  // Request body
   if (req.body) {
     html += '<div class="json-viewer">' +
-      '<button class="copy-btn" onclick="copyToClipboard(\'' +
-        escapeHtml(JSON.stringify(req.body, null, 2).replace(/'/g, "\\'").replace(/\n/g, '\\n')) +
-      '\', this)">Copy</button>' +
       '<pre class="code-block">' + syntaxHighlight(req.body) + '</pre>' +
     '</div>';
   }
@@ -622,139 +735,13 @@ function renderRequestTab(req) {
   return html;
 }
 
-/**
- * Render a single response entry.
- */
-function renderResponseEntry(resp, index, total) {
-  if (!resp) return '<div class="empty-viewer">No response data</div>';
-
-  let html = '';
-  const status = resp.status || 0;
-
-  // Status class
-  let statusClass = '';
-  if (status >= 200 && status < 300) statusClass = 'status-ok';
-  else if (status === 202) statusClass = 'status-accepted';
-  else if (status === 303) statusClass = 'status-redirect';
-  else if (status >= 400 && status < 500) statusClass = 'status-error';
-  else if (status >= 500) statusClass = 'status-server-error';
-
-  // Show response number if part of a chain
-  if (total > 1) {
-    html += '<div class="response-chain-header">' +
-      '<span class="response-chain-label">Response ' + (index + 1) + ' of ' + total + '</span>' +
-    '</div>';
-  }
-
-  html += '<div class="meta-row">' +
-    '<span class="meta-label">Status</span>' +
-    '<span class="meta-value ' + statusClass + '">' + status + '</span>' +
-  '</div>';
-
-  html += '<div class="meta-row">' +
-    '<span class="meta-label">Time</span>' +
-    '<span class="meta-value">' + (resp.timeMs || resp.elapsed || 0) + 'ms</span>' +
-  '</div>';
-
-  // Response state if present
-  if (resp.body?.state) {
-    html += '<div class="meta-row">' +
-      '<span class="meta-label">State</span>' +
-      '<span class="meta-value">' +
-        '<span class="status-indicator status-' + escapeHtml(resp.body.state) + '">' +
-          escapeHtml(resp.body.state) +
-        '</span>' +
-      '</span>' +
-    '</div>';
-  }
-
-  // Response body
-  if (resp.body) {
-    const jsonStr = JSON.stringify(resp.body, null, 2);
-    const textareaId = 'response-json-raw-' + index;
-    html += '<div class="json-viewer">' +
-      '<button class="copy-btn" onclick="copyToClipboard(document.getElementById(\'' + textareaId + '\').value, this)">Copy</button>' +
-      '<pre class="code-block">' + syntaxHighlight(resp.body) + '</pre>' +
-      '<textarea class="sr-only" id="' + textareaId + '">' + escapeHtml(jsonStr) + '</textarea>' +
-    '</div>';
-  }
-
-  return html;
-}
-
-/**
- * Render the full response chain (for async operations with polling).
- */
-function renderResponseChain(responseChain) {
-  if (!responseChain || responseChain.length === 0) {
-    return '<div class="empty-viewer">No response data</div>';
-  }
-
-  let html = '';
-  const total = responseChain.length;
-
-  // Render each response in the chain
-  responseChain.forEach((resp, index) => {
-    html += '<div class="response-entry">';
-    html += renderResponseEntry(resp, index, total);
-    html += '</div>';
-    if (index < total - 1) {
-      html += '<div class="response-chain-divider"></div>';
-    }
-  });
-
-  return html;
-}
-
-/**
- * Render the response tab content (backwards compatibility wrapper).
- */
-function renderResponseTab(resp) {
-  return renderResponseEntry(resp, 0, 1);
-}
-
-/**
- * Copy the raw JSON response to clipboard.
- */
-function copyJsonResponse(btn) {
-  const raw = document.getElementById('response-json-raw');
-  if (raw) {
-    copyToClipboard(raw.value, btn);
-  }
-}
-window.copyJsonResponse = copyJsonResponse;
-
-/**
- * Switch between envelope viewer tabs.
- */
-function switchViewerTab(tabName) {
-  const viewer = document.getElementById('envelope-viewer');
-  if (!viewer) return;
-
-  // Update tab active state
-  viewer.querySelectorAll('.tab').forEach(function(tab) {
-    if (tab.getAttribute('data-viewer-tab') === tabName) {
-      tab.classList.add('active');
-    } else {
-      tab.classList.remove('active');
-    }
-  });
-
-  // Show/hide content
-  viewer.querySelectorAll('.tab-content').forEach(function(content) {
-    if (content.getAttribute('data-viewer-content') === tabName) {
-      content.style.display = '';
-    } else {
-      content.style.display = 'none';
-    }
-  });
-}
-
 // Make functions globally available
-window.switchViewerTab = switchViewerTab;
 window.clearEnvelopeViewer = clearEnvelopeViewer;
+window.selectRequest = selectRequest;
 window.envelopePrev = envelopePrev;
 window.envelopeNext = envelopeNext;
+window.toggleViewerCollapse = toggleViewerCollapse;
+window.copyAsCurl = copyAsCurl;
 window.copyToClipboard = copyToClipboard;
 
 
@@ -1173,20 +1160,13 @@ async function initItemDetail() {
   }
 
   // Tags
-  if (item.tags && Array.isArray(JSON.parse(item.tags || '[]')) && JSON.parse(item.tags || '[]').length > 0) {
-    const tags = JSON.parse(item.tags);
+  const tags = Array.isArray(item.tags) ? item.tags
+    : (typeof item.tags === 'string' ? JSON.parse(item.tags || '[]') : []);
+  if (tags.length > 0) {
     html += '<div class="detail-row">' +
       '<span class="detail-label">Tags</span>' +
       '<span class="detail-value">';
     tags.forEach(function(tag) {
-      html += '<span class="badge badge-info mr-2">' + escapeHtml(tag) + '</span>';
-    });
-    html += '</span></div>';
-  } else if (Array.isArray(item.tags) && item.tags.length > 0) {
-    html += '<div class="detail-row">' +
-      '<span class="detail-label">Tags</span>' +
-      '<span class="detail-value">';
-    item.tags.forEach(function(tag) {
       html += '<span class="badge badge-info mr-2">' + escapeHtml(tag) + '</span>';
     });
     html += '</span></div>';

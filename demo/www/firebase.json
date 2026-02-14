@@ -2,7 +2,7 @@
   "hosting": {
     "site": "opencall-www",
     "public": ".",
-    "ignore": ["firebase.json"],
+    "ignore": ["firebase.json", "**/node_modules/**", "**/src/**", "Dockerfile", "package.json", "bun.lock*", "tsconfig.json"],
     "headers": [
       {
         "source": "**",

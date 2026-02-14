@@ -85,7 +85,7 @@ function seedTestDb(db: Database): void {
 
   // ── Fixed test patron for integration tests ──────────────────────────
   const TEST_PATRON_ID = "00000000-0000-0000-0000-000000000001";
-  const TEST_CARD_NUMBER = "TEST-DEMO-00";
+  const TEST_CARD_NUMBER = "0000-0000-TP";
 
   const insertPatron = db.prepare(
     `INSERT INTO patrons (id, username, name, card_number, created_at, is_seed)

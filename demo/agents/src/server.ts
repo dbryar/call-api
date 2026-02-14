@@ -3,7 +3,7 @@
  * Serves agent instructions markdown with templated URLs
  */
 
-const PORT = parseInt(process.env.AGENTS_PORT || process.env.PORT || "3003", 10);
+const PORT = parseInt(process.env.AGENTS_PORT || process.env.PORT || "8888", 10);
 const API_URL = process.env.API_URL || "http://localhost:3000";
 
 // Read and template the markdown file

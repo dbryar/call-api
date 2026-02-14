@@ -4,7 +4,7 @@ import { startServer, stopServer } from "./helpers/server.ts";
 const BASE_URL = `http://localhost:${process.env.TEST_PORT || 9876}`;
 
 // Fixed test data (from seed.ts)
-const TEST_CARD_NUMBER = "TEST-DEMO-00";
+const TEST_CARD_NUMBER = "0000-0000-TP";
 const TEST_BOOK_ID = "00000000-0000-0000-0000-000000000100";
 const TEST_BOOK_TITLE = "The Test Pattern Handbook";
 
@@ -286,7 +286,7 @@ describe("Test User Integration", () => {
 // ── CORS Integration Tests ───────────────────────────────────────────────
 
 describe("CORS Integration", () => {
-  const APP_ORIGIN = "http://localhost:3000";
+  const APP_ORIGIN = "http://localhost:8000";
 
   test("browser can call API directly with CORS", async () => {
     // First get a token

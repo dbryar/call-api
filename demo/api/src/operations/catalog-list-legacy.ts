@@ -8,8 +8,8 @@ import { listItems } from "../services/catalog.ts";
  *
  * @op v1:catalog.listLegacy
  * @execution sync
- * @timeout 5000
- * @ttl 3600
+ * @timeout 5s
+ * @ttl 1h
  * @security items:browse
  * @cache server
  * @flags deprecated

@@ -1,5 +1,6 @@
 import { getDb } from "../db/connection.ts";
 import { transitionOperation } from "./lifecycle.ts";
+import { uploadReport, isGcsConfigured } from "./media.ts";
 
 /** In-memory store for generated report data, keyed by requestId */
 export const reportStore = new Map<string, string>();
@@ -10,7 +11,8 @@ export const reportStore = new Map<string, string>();
  * 2. Waits 3-5 seconds (simulated processing)
  * 3. Queries lending data from the database
  * 4. Formats as CSV or JSON
- * 5. Stores in memory and transitions to 'complete'
+ * 5. Uploads to GCS (if configured) or stores in memory
+ * 6. Transitions to 'complete'
  */
 export async function generateReport(
   requestId: string,
@@ -63,6 +65,7 @@ export async function generateReport(
 
     // 4. Format the report
     let reportContent: string;
+    const mimeType = args.format === "csv" ? "text/csv" : "application/json";
 
     if (args.format === "csv") {
       const header = "id,item_id,title,type,creator,patron_id,patron_name,checkout_date,due_date,return_date,days_late";
@@ -102,15 +105,20 @@ export async function generateReport(
       );
     }
 
-    // 5. Store in memory
+    // 5. Upload to GCS if configured
+    if (isGcsConfigured()) {
+      await uploadReport(requestId, reportContent, mimeType);
+    }
+
+    // 6. Store in memory for chunk retrieval
     reportStore.set(requestId, reportContent);
 
-    // 6. Also store in DB for persistence across module reloads
+    // 7. Also store in DB for persistence across module reloads
     db.prepare(
       "UPDATE operations SET result_data = ? WHERE request_id = ?"
     ).run(reportContent, requestId);
 
-    // 7. Transition to complete with a download location
+    // 8. Transition to complete with a download location
     const resultLocation = `/ops/${requestId}/chunks`;
     transitionOperation(requestId, { type: "COMPLETE", resultLocation });
   } catch (err) {

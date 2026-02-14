@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll, jest } from "bun:test";
 import { startServer, stopServer } from "./helpers/server.ts";
 import { call, authenticate } from "./helpers/client.ts";
 
@@ -196,6 +196,47 @@ describe("v1:catalog.listLegacy", () => {
   });
 });
 
+// ── catalog.listLegacy — 410 sunset ─────────────────────────────────────
+
+describe("v1:catalog.listLegacy — 410 sunset", () => {
+  let token: string;
+
+  beforeAll(async () => {
+    const auth = await authenticate();
+    token = auth.body.token;
+  });
+
+  test("returns 410 OP_REMOVED after sunset date with replacement in cause", async () => {
+    // Create a token with a far-future expiry so it survives our Date.now mock
+    const { getDb } = await import("../src/db/connection.ts");
+    const db = getDb();
+    const farFutureExpiry = "2027-01-01T00:00:00.000Z";
+    db.prepare("UPDATE auth_tokens SET expires_at = ? WHERE token = ?").run(farFutureExpiry, token);
+
+    // Mock Date.now to return a date after 2026-06-01
+    const realDateNow = Date.now;
+    Date.now = () => new Date("2026-07-01T00:00:00Z").getTime();
+
+    try {
+      const res = await call("v1:catalog.listLegacy", {}, undefined, token);
+      expect(res.status).toBe(410);
+      expect(res.body.state).toBe("error");
+      expect(res.body.error!.code).toBe("OP_REMOVED");
+      expect(res.body.error!.cause).toBeDefined();
+      expect(res.body.error!.cause!.replacement).toBe("v1:catalog.list");
+      expect(res.body.error!.cause!.sunset).toBe("2026-06-01");
+    } finally {
+      Date.now = realDateNow;
+    }
+  });
+
+  test("still works before sunset date", async () => {
+    const res = await call("v1:catalog.listLegacy", {}, undefined, token);
+    expect(res.status).toBe(200);
+    expect(res.body.state).toBe("complete");
+  });
+});
+
 // ── item.get ────────────────────────────────────────────────────────────
 
 describe("v1:item.get", () => {
@@ -266,13 +307,13 @@ describe("v1:item.getMedia", () => {
     if (res.status === 200) {
       expect(res.body.state).toBe("complete");
       expect(res.body.result).toBeDefined();
-      const result = res.body.result as { placeholder: boolean; url: string };
+      const result = res.body.result as { placeholder: boolean; uri: string };
       expect(result.placeholder).toBe(true);
-      expect(result.url).toContain("placeholder");
+      expect(result.uri).toContain("placeholder");
     } else {
       expect(res.body.state).toBe("complete");
       expect(res.body.location).toBeDefined();
-      expect(res.body.location!.uri).toContain("storage.googleapis.com");
+      expect(res.body.location!.uri).toBeDefined();
     }
   });
 

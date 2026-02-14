@@ -1,7 +1,5 @@
 import { getOperationState, updateLastPolled } from "../services/lifecycle.ts";
-
-/** Rate-limiting: track last poll time per requestId in memory */
-const lastPollTimes = new Map<string, number>();
+import { checkRateLimit } from "./rate-limit.ts";
 
 /**
  * Handle GET /ops/{requestId} — poll for async operation status.
@@ -13,7 +11,7 @@ const lastPollTimes = new Map<string, number>();
  * - error: 200 with error details
  *
  * Returns 404 if operation not found.
- * Returns 429 if polled within 500ms of last poll.
+ * Returns 429 if polled within 1 second of last poll (per requestId).
  */
 export function handlePolling(requestId: string): Response {
   // Look up operation state
@@ -33,22 +31,10 @@ export function handlePolling(requestId: string): Response {
     );
   }
 
-  // Rate limiting: 429 if polled within 500ms
-  const now = Date.now();
-  const lastPoll = lastPollTimes.get(requestId);
-  if (lastPoll !== undefined && now - lastPoll < 500) {
-    return new Response(
-      JSON.stringify({
-        requestId,
-        state: op.state,
-        retryAfterMs: 500 - (now - lastPoll),
-      }),
-      { status: 429, headers: { "Content-Type": "application/json" } }
-    );
-  }
+  // Rate limiting: 429 if polled within 1 second (per requestId)
+  const rateLimitResponse = checkRateLimit(requestId);
+  if (rateLimitResponse) return rateLimitResponse;
 
-  // Update poll tracking
-  lastPollTimes.set(requestId, now);
   updateLastPolled(requestId);
 
   // Build response based on state
